@@ -84,6 +84,11 @@
         android:label="@string/app_name"
         android:windowSoftInputMode="adjustResize"
         android:largeHeap="true">
+        <receiver android:name=".SMSInstrumentedReceiver">
+            <intent-filter>
+                <action android:name="edu.gatech.m3.emma.COLLECT_COVERAGE" />
+            </intent-filter>
+        </receiver>
         <activity
             android:name="com.ichi2.anki.IntentHandler"
             android:configChanges="keyboardHidden|orientation|screenSize|locale"
