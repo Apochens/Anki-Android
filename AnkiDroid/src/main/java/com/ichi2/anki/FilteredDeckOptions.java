@@ -30,6 +30,7 @@ import android.preference.CheckBoxPreference;
 import android.preference.EditTextPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 
@@ -128,6 +129,16 @@ public class FilteredDeckOptions extends AppCompatPreferenceActivity implements 
 
                 try {
                     for (Entry<String, Object> entry : mUpdate.valueSet()) {
+
+                        /** Themis-#5756 */
+                        if (entry.getKey().equals("order") && entry.getValue().equals("1")) {
+                            Log.i("Themis-#5756", "Step 5: Switch order to \"Random\".");
+                        }
+                        if (entry.getKey().equals("order") && entry.getValue().equals("0")) {
+                            Log.i("Themis-#5756", "Step 6: Switch order back to \"Oldest seen first\".");
+                        }
+                        /** Themis-#5756 */
+
                         Timber.i("Change value for key '" + entry.getKey() + "': " + entry.getValue());
                         if (entry.getKey().equals("search")) {
                             JSONArray ar = mDeck.getJSONArray("terms");
@@ -406,6 +417,15 @@ public class FilteredDeckOptions extends AppCompatPreferenceActivity implements 
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case android.R.id.home:
+
+                /** Themis-#5756 */
+                try {
+                    Log.i("Themis-#5756", "Step 7: Go back from Options for " + mDeck.getString("name") + ".");
+                } catch (Exception e) {
+
+                }
+                /** Themis-#5756 */
+
                 closeDeckOptions();
                 return true;
         }

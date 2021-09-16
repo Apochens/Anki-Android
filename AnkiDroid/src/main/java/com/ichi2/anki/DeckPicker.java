@@ -55,6 +55,7 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -211,6 +212,14 @@ public class DeckPicker extends NavigationDrawerActivity implements
         @Override
         public void onClick(View v) {
             long deckId = (long) v.getTag();
+
+            /** Themis-#5756 */
+            Log.i("Themis-#5756", "Step 8: Selected deck "
+                    + deckId
+                    + " after previous steps. If no bug occurs, The Decker may be empty"
+                    + " or the corresponding deck doesn't been selected.");
+            /** Themis-#5756 */
+
             Timber.i("DeckPicker:: Selected deck with id %d", deckId);
             if (mActionsMenu != null && mActionsMenu.isExpanded()) {
                 mActionsMenu.collapse();
@@ -490,6 +499,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
             addSharedDeck();
         });
         addNoteButton.setOnClickListener(view -> {
+
+            /** Themis-#5756 */
+            Log.i("Themis-#5756", "Step 1: Click \"" + getString(R.string.menu_add) + "\" Button.");
+            /** Themis-#5756 */
+
             mActionsMenu.collapse();
             addNote();
         });
@@ -551,6 +565,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
                 return true;
 
             case R.id.action_new_filtered_deck: {
+
+                /** Themis-#5756 */
+                Log.i("Themis-#5756", "Step 3: Create filtered deck item was selected.");
+                /** Themis-#5756 */
+
                 Timber.i("DeckPicker:: New filtered deck button pressed");
                 mDialogEditText = new EditText(DeckPicker.this);
                 ArrayList<String> names = getCol().getDecks().allNames();
@@ -568,6 +587,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
                         .positiveText(res.getString(R.string.create))
                         .negativeText(res.getString(R.string.dialog_cancel))
                         .onPositive((dialog, which) -> {
+
+                            /** Themis-#5756 */
+                            Log.i("Themis-#5756", "Step 4: Created a new filtered deck.");
+                            /** Themis-#5756 */
+
                             String filteredDeckName = mDialogEditText.getText().toString();
                             Timber.i("DeckPicker:: Creating filtered deck...");
                             getCol().getDecks().newDyn(filteredDeckName);

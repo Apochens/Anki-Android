@@ -34,6 +34,7 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 
+import android.util.Log;
 import android.util.Pair;
 import android.view.ActionMode;
 import android.view.KeyEvent;
@@ -879,6 +880,11 @@ public class NoteEditor extends AnkiActivity {
                 return true;
 
             case R.id.action_save:
+
+                /** Themis-#5756 */
+                Log.i("Themis-#5756", "Step 2: Save or add a note.");
+                /** Themis-#5756 */
+
                 Timber.i("NoteEditor:: Save note button pressed");
                 saveNote();
                 return true;
