@@ -3,6 +3,8 @@ package com.ichi2.anki.dialogs;
 
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 
 import com.afollestad.materialdialogs.DialogAction;
@@ -96,6 +98,11 @@ public class ExportDialog extends AnalyticsDialogFragment {
                 .onPositive(new MaterialDialog.SingleButtonCallback() {
                     @Override
                     public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
+
+                        /** Themis-#6145 */
+                        Log.i("Themis-#6145", "Step 6: Selected \"OK\" in Export Dialog. Bug will occur.");
+                        /** Themis-#6145 */
+
                         ((ExportDialogListener) getActivity())
                                 .exportApkg(null, did != -1L ? did : null, mIncludeSched, mIncludeMedia);
                         dismissAllDialogFragments();

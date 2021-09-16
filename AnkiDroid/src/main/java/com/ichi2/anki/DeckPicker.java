@@ -56,6 +56,7 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -646,6 +647,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
                 return true;
 
             case R.id.action_export: {
+
+                /** Themis-#6145 */
+                Log.i("Themis-#6145", "Step 5: Selected \"Export colloction\" in menu at DeckPicker.");
+                /** Themis-#6145 */
+
                 Timber.i("DeckPicker:: Export collection button pressed");
                 String msg = getResources().getString(R.string.confirm_apkg_export);
                 showDialogFragment(ExportDialog.newInstance(msg));

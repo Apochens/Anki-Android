@@ -41,6 +41,7 @@ import android.preference.PreferenceCategory;
 import android.preference.PreferenceGroup;
 import android.preference.PreferenceScreen;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.WindowManager.BadTokenException;
 import android.widget.Toast;
@@ -202,6 +203,23 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
             case "com.ichi2.anki.prefs.general":
                 listener.addPreferencesFromResource(R.xml.preferences_general);
                 screen = listener.getPreferenceScreen();
+
+                /** Themis-#6145 */
+                Log.i("Themis-#6145", "Step 1: Click \"AnkiDroid\" in Preferences.");
+                ListPreference language = (ListPreference) screen.findPreference("language");
+                language.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                    @Override
+                    public boolean onPreferenceChange(Preference preference, Object newValue) {
+                        if (newValue.equals("zh_Cn")) {
+                            Log.i("Themis-#6145", "Step 2: Change language to " + newValue.toString());
+                        } else {
+                            Log.i("Themis-#6145", "Warning 2: Change language to other language (not Chinese).");
+                        }
+                        return true;
+                    }
+                });
+                /** Themis-#6145 */
+
                 if (AdaptionUtil.isRestrictedLearningDevice()) {
                     CheckBoxPreference mCheckBoxPref_Vibrate = (CheckBoxPreference) screen.findPreference("widgetVibrate");
                     CheckBoxPreference mCheckBoxPref_Blink = (CheckBoxPreference) screen.findPreference("widgetBlink");
@@ -277,6 +295,25 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
             case "com.ichi2.anki.prefs.advanced":
                 listener.addPreferencesFromResource(R.xml.preferences_advanced);
                 screen = listener.getPreferenceScreen();
+
+                /** Themis-#6145 */
+                Log.i("Themis-#6145", "Step 3: Click \"Advanced\" in Preferences.");
+                CheckBoxPreference schedVer = (CheckBoxPreference) screen.findPreference("schedVer");
+                schedVer.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                    @Override
+                    public boolean onPreferenceChange(Preference preference, Object newValue) {
+
+                        if (newValue.equals(true)) {
+                            Log.i("Themis-#6145", "Step 4: Enable the \"Experimental V2 Scheduler\".");
+                        } else {
+                            Log.i("Themis-#6145", "Step -4: Disable the \"Experimental V2 Scheduler\".");
+                        }
+
+                        return true;
+                    }
+                });
+                /** Themis-#6145 */
+
                 // Check that input is valid before committing change in the collection path
                 EditTextPreference collectionPathPreference = (EditTextPreference) screen.findPreference("deckPath");
                 collectionPathPreference.setOnPreferenceChangeListener((preference, newValue) -> {
