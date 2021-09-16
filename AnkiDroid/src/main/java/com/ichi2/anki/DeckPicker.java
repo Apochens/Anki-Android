@@ -47,6 +47,7 @@ import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -484,6 +485,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
         addSharedButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
+
+                /** Themis-#4977 */
+                Log.i("Themis-#4977", "Step 1: Clicked the \"Shared decks\" button in the floating menu.");
+                /** Themis-#4977 */
+
                 mActionsMenu.collapse();
                 addSharedDeck();
             }

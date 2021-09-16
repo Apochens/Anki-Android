@@ -29,6 +29,7 @@ import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.widget.SwitchCompat;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -289,6 +290,11 @@ public class NavigationDrawerActivity extends AnkiActivity implements Navigation
                         startActivityWithAnimation(deckPicker, ActivityTransitionAnimation.RIGHT);
                         break;
                     case R.id.nav_browser:
+
+                        /** Themis-#4977 */
+                        Log.i("Themis-#4977", "Step 2: Clicked the \"Browser\" in the menu. The crash will occur.");
+                        /** Themis-#4977 */
+
                         openCardBrowser();
                         break;
                     case R.id.nav_stats:
