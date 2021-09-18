@@ -20,14 +20,28 @@ public class SyncErrorDialog extends AsyncDialogFragment {
     public static final int DIALOG_MEDIA_SYNC_ERROR = 9;
 
     public interface SyncErrorDialogListener {
-        void showSyncErrorDialog(int dialogType);
-        void showSyncErrorDialog(int dialogType, String message);
-        void loginToSyncServer();
-        void sync();
-        void sync(String conflict);
-        Collection getCol();
-        void mediaCheck();
-        void dismissAllDialogFragments();
+        public void showSyncErrorDialog(int dialogType);
+
+
+        public void showSyncErrorDialog(int dialogType, String message);
+
+
+        public void loginToSyncServer();
+
+
+        public void sync();
+
+
+        public void sync(String conflict);
+
+
+        public Collection getCol();
+
+
+        public void mediaCheck();
+
+
+        public void dismissAllDialogFragments();
     }
 
 
@@ -56,101 +70,148 @@ public class SyncErrorDialog extends AsyncDialogFragment {
                 .cancelable(true);
 
         switch (getArguments().getInt("dialogType")) {
-            case DIALOG_USER_NOT_LOGGED_IN_SYNC: {
+            case DIALOG_USER_NOT_LOGGED_IN_SYNC:
                 // User not logged in; take them to login screen
                 return builder.iconAttr(R.attr.dialogSyncErrorIcon)
                         .positiveText(res().getString(R.string.log_in))
                         .negativeText(res().getString(R.string.dialog_cancel))
-                        .onPositive((dialog, which) -> ((SyncErrorDialogListener) getActivity()).loginToSyncServer())
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity()).loginToSyncServer();
+                            }
+                        })
                         .show();
-            }
-            case DIALOG_CONNECTION_ERROR: {
+
+            case DIALOG_CONNECTION_ERROR:
                 // Connection error; allow user to retry or cancel
                 return builder.iconAttr(R.attr.dialogSyncErrorIcon)
                         .positiveText(res().getString(R.string.retry))
                         .negativeText(res().getString(R.string.dialog_cancel))
-                        .onPositive((dialog, which) -> {
-                            ((SyncErrorDialogListener) getActivity()).sync();
-                            dismissAllDialogFragments();
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity()).sync();
+                                dismissAllDialogFragments();
+                            }
+
+                            @Override
+                            public void onNegative(MaterialDialog dialog) {
+                                dismissAllDialogFragments();
+                            }
                         })
-                        .onNegative((dialog, which) -> dismissAllDialogFragments())
                         .show();
-            }
-            case DIALOG_SYNC_CONFLICT_RESOLUTION: {
+
+            case DIALOG_SYNC_CONFLICT_RESOLUTION:
                 // Sync conflict; allow user to cancel, or choose between local and remote versions
                 return builder.iconAttr(R.attr.dialogSyncErrorIcon)
                         .positiveText(res().getString(R.string.sync_conflict_local))
                         .negativeText(res().getString(R.string.sync_conflict_remote))
                         .neutralText(res().getString(R.string.dialog_cancel))
-                        .onPositive((dialog, which) -> ((SyncErrorDialogListener) getActivity())
-                                .showSyncErrorDialog(DIALOG_SYNC_CONFLICT_CONFIRM_KEEP_LOCAL))
-                        .onNegative((dialog, which) -> ((SyncErrorDialogListener) getActivity())
-                                .showSyncErrorDialog(DIALOG_SYNC_CONFLICT_CONFIRM_KEEP_REMOTE))
-                        .onNeutral((dialog, which) -> dismissAllDialogFragments())
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity())
+                                        .showSyncErrorDialog(DIALOG_SYNC_CONFLICT_CONFIRM_KEEP_LOCAL);
+                            }
+
+                            @Override
+                            public void onNegative(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity())
+                                        .showSyncErrorDialog(DIALOG_SYNC_CONFLICT_CONFIRM_KEEP_REMOTE);
+                            }
+
+                            @Override
+                            public void onNeutral(MaterialDialog dialog) {
+                                dismissAllDialogFragments();
+                            }
+                        })
                         .show();
-            }
-            case DIALOG_SYNC_CONFLICT_CONFIRM_KEEP_LOCAL: {
+
+            case DIALOG_SYNC_CONFLICT_CONFIRM_KEEP_LOCAL:
                 // Confirmation before pushing local collection to server after sync conflict
                 return builder.positiveText(res().getString(R.string.dialog_positive_overwrite))
                         .negativeText(res().getString(R.string.dialog_cancel))
-                        .onPositive((dialog, which) -> {
-                            SyncErrorDialogListener activity = (SyncErrorDialogListener) getActivity();
-                            activity.sync("upload");
-                            dismissAllDialogFragments();
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                SyncErrorDialogListener activity = (SyncErrorDialogListener) getActivity();
+                                activity.sync("upload");
+                                dismissAllDialogFragments();
+                            }
                         })
                         .show();
-            }
-            case DIALOG_SYNC_CONFLICT_CONFIRM_KEEP_REMOTE: {
+
+            case DIALOG_SYNC_CONFLICT_CONFIRM_KEEP_REMOTE:
                 // Confirmation before overwriting local collection with server collection after sync conflict
                 return builder.positiveText(res().getString(R.string.dialog_positive_overwrite))
                         .negativeText(res().getString(R.string.dialog_cancel))
-                        .onPositive((dialog, which) -> {
-                            SyncErrorDialogListener activity = (SyncErrorDialogListener) getActivity();
-                            activity.sync("download");
-                            dismissAllDialogFragments();
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                SyncErrorDialogListener activity = (SyncErrorDialogListener) getActivity();
+                                activity.sync("download");
+                                dismissAllDialogFragments();
+                            }
                         })
                         .show();
-            }
-            case DIALOG_SYNC_SANITY_ERROR: {
+
+            case DIALOG_SYNC_SANITY_ERROR:
                 // Sync sanity check error; allow user to cancel, or choose between local and remote versions
                 return builder.positiveText(res().getString(R.string.sync_sanity_local))
                         .neutralText(res().getString(R.string.sync_sanity_remote))
                         .negativeText(res().getString(R.string.dialog_cancel))
-                        .onPositive((dialog, which) -> ((SyncErrorDialogListener) getActivity())
-                                .showSyncErrorDialog(DIALOG_SYNC_SANITY_ERROR_CONFIRM_KEEP_LOCAL))
-                        .onNeutral((dialog, which) -> ((SyncErrorDialogListener) getActivity())
-                                .showSyncErrorDialog(DIALOG_SYNC_SANITY_ERROR_CONFIRM_KEEP_REMOTE))
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity())
+                                        .showSyncErrorDialog(DIALOG_SYNC_SANITY_ERROR_CONFIRM_KEEP_LOCAL);
+                            }
+
+                            @Override
+                            public void onNeutral(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity())
+                                        .showSyncErrorDialog(DIALOG_SYNC_SANITY_ERROR_CONFIRM_KEEP_REMOTE);
+                            }
+                        })
                         .show();
-            }
-            case DIALOG_SYNC_SANITY_ERROR_CONFIRM_KEEP_LOCAL: {
+
+            case DIALOG_SYNC_SANITY_ERROR_CONFIRM_KEEP_LOCAL:
                 // Confirmation before pushing local collection to server after sanity check error
                 return builder.positiveText(res().getString(R.string.dialog_positive_overwrite))
                         .negativeText(res().getString(R.string.dialog_cancel))
-                        .onPositive((dialog, which) -> {
-                            ((SyncErrorDialogListener) getActivity()).sync("upload");
-                            dismissAllDialogFragments();
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity()).sync("upload");
+                                dismissAllDialogFragments();
+                            }
                         })
                         .show();
-            }
-            case DIALOG_SYNC_SANITY_ERROR_CONFIRM_KEEP_REMOTE: {
+
+            case DIALOG_SYNC_SANITY_ERROR_CONFIRM_KEEP_REMOTE:
                 // Confirmation before overwriting local collection with server collection after sanity check error
                 return builder.positiveText(res().getString(R.string.dialog_positive_overwrite))
                         .negativeText(res().getString(R.string.dialog_cancel))
-                        .onPositive((dialog, which) -> {
-                            ((SyncErrorDialogListener) getActivity()).sync("download");
-                            dismissAllDialogFragments();
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity()).sync("download");
+                                dismissAllDialogFragments();
+                            }
                         })
                         .show();
-            }
-            case DIALOG_MEDIA_SYNC_ERROR: {
+            case DIALOG_MEDIA_SYNC_ERROR:
                 return builder.positiveText(R.string.check_media)
                         .negativeText(R.string.cancel)
-                        .onPositive((dialog, which) -> {
-                            ((SyncErrorDialogListener) getActivity()).mediaCheck();
-                            dismissAllDialogFragments();
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                ((SyncErrorDialogListener) getActivity()).mediaCheck();
+                                dismissAllDialogFragments();
+                            }
                         })
                         .show();
-            }
             default:
                 return null;
         }

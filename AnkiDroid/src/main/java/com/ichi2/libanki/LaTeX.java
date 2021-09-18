@@ -18,7 +18,8 @@
 
 package com.ichi2.libanki;
 
-import com.ichi2.utils.JSONObject;
+import com.ichi2.libanki.hooks.Hook;
+import com.ichi2.libanki.hooks.Hooks;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,7 +37,6 @@ import java.util.regex.Pattern;
  * Unlike the original python implementation of this class, the AnkiDroid version does not support
  * the generation of LaTeX images.
  */
-@SuppressWarnings({"PMD.MethodNamingConventions","PMD.AvoidReassigningParameters"})
 public class LaTeX {
 
     /**
@@ -52,21 +52,23 @@ public class LaTeX {
 
     /**
      * Convert HTML with embedded latex tags to image links.
-     * NOTE: _imgLink produces an alphanumeric filename so there is no need to escape the replacement string.
+     * NOTE: Unlike the original python version of this method, only two parameters are required
+     * in AnkiDroid. The omitted parameters are used to generate LaTeX images. AnkiDroid does not
+     * support the generation of LaTeX media and the provided parameters are sufficient for all
+     * other cases.
      */
-    public static String mungeQA(String html, Collection col, JSONObject model) {
+    public static String mungeQA(String html, Collection col) {
         StringBuffer sb = new StringBuffer();
         Matcher matcher = sStandardPattern.matcher(html);
-        Media m = col.getMedia();
         while (matcher.find()) {
-            matcher.appendReplacement(sb, _imgLink(matcher.group(1), model, m));
+            matcher.appendReplacement(sb, _imgLink(col, matcher.group(1)));
         }
         matcher.appendTail(sb);
 
         matcher = sExpressionPattern.matcher(sb.toString());
         sb = new StringBuffer();
         while (matcher.find()) {
-            matcher.appendReplacement(sb, _imgLink("$" + matcher.group(1) + "$", model, m));
+            matcher.appendReplacement(sb, _imgLink(col, "$" + matcher.group(1) + "$"));
         }
         matcher.appendTail(sb);
 
@@ -74,7 +76,7 @@ public class LaTeX {
         sb = new StringBuffer();
         while (matcher.find()) {
             matcher.appendReplacement(sb,
-                    _imgLink("\\begin{displaymath}" + matcher.group(1) + "\\end{displaymath}", model, m));
+                    _imgLink(col, "\\begin{displaymath}" + matcher.group(1) + "\\end{displaymath}"));
         }
         matcher.appendTail(sb);
 
@@ -85,29 +87,31 @@ public class LaTeX {
     /**
      * Return an img link for LATEX.
      */
-    private static String _imgLink(String latex, JSONObject model, Media m) {
-        String txt = _latexFromHtml(latex);
-
-        String ext = "png";
-        if (model.optBoolean("latexsvg", false)) {
-            ext = "svg";
-        }
-
-        String fname = "latex-" + Utils.checksum(txt) + "." + ext;
-        if (m.have(fname)) {
-            return "<img class=latex src=\"" + fname + "\">";
-        } else {
-            return Matcher.quoteReplacement(latex);
-        }
+    private static String _imgLink(Collection col, String latex) {
+        String txt = _latexFromHtml(col, latex);
+        String fname = "latex-" + Utils.checksum(txt) + ".png";
+        return "<img class=latex src=\"" + fname + "\">";
     }
 
 
     /**
      * Convert entities and fix newlines.
      */
-    private static String _latexFromHtml(String latex) {
+    private static String _latexFromHtml(Collection col, String latex) {
         latex = latex.replaceAll("<br( /)?>|<div>", "\n");
         latex = Utils.stripHTML(latex);
         return latex;
+    }
+
+    public class LaTeXFilter extends Hook {
+        @Override
+        public Object runFilter(Object arg, Object... args) {
+            return LaTeX.mungeQA((String) arg, (Collection) args[4]);
+        }
+    }
+
+
+    public void installHook(Hooks h) {
+        h.addHook("mungeQA", new LaTeXFilter());
     }
 }

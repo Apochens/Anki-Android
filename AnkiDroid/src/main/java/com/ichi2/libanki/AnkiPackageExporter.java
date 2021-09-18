@@ -17,15 +17,10 @@
 package com.ichi2.libanki;
 
 import android.content.Context;
-import android.database.sqlite.SQLiteDatabase;
 
-import com.ichi2.anki.CollectionHelper;
-import com.ichi2.anki.R;
-import com.ichi2.anki.exception.ImportExportException;
-import com.ichi2.compat.CompatHelper;
-import com.ichi2.utils.JSONArray;
-import com.ichi2.utils.JSONException;
-import com.ichi2.utils.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -39,15 +34,14 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
-import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import timber.log.Timber;
 
 class Exporter {
-    protected Collection mCol;
-    protected Long mDid;
-    protected int mCount;
+    Collection mCol;
+    Long mDid;
 
 
     public Exporter(Collection col) {
@@ -60,31 +54,17 @@ class Exporter {
         mCol = col;
         mDid = did;
     }
-
-    /** card ids of cards in deck self.did if it is set, all ids otherwise. */
-    public Long[] cardIds() {
-        Long[] cids;
-        if (mDid == null) {
-            cids = Utils.list2ObjectArray(mCol.getDb().queryColumn(Long.class, "select id from cards", 0));
-        } else {
-            cids = mCol.getDecks().cids(mDid, true);
-        }
-        mCount = cids.length;
-        return cids;
-    }
 }
 
 
-@SuppressWarnings({"PMD.AvoidReassigningParameters","PMD.DefaultPackage",
-        "PMD.NPathComplexity","PMD.MethodNamingConventions","PMD.ExcessiveMethodLength",
-        "PMD.EmptyIfStmt","PMD.CollapsibleIfStatements"})
+
 class AnkiExporter extends Exporter {
-    protected boolean mIncludeSched;
-    protected boolean mIncludeMedia;
-    private Collection mSrc;
+    boolean mIncludeSched;
+    boolean mIncludeMedia;
+    Collection mSrc;
     String mMediaDir;
+    int mCount;
     ArrayList<String> mMediaFiles = new ArrayList<>();
-    boolean _v2sched;
 
 
     public AnkiExporter(Collection col) {
@@ -104,13 +84,18 @@ class AnkiExporter extends Exporter {
      * @throws IOException
      */
 
-    public void exportInto(String path, Context context) throws JSONException, IOException, ImportExportException {
+    public void exportInto(String path, Context context) throws JSONException, IOException {
         // create a new collection at the target
         new File(path).delete();
         Collection dst = Storage.Collection(context, path);
         mSrc = mCol;
         // find cards
-        Long[] cids = cardIds();
+        Long[] cids;
+        if (mDid == null) {
+            cids = Utils.list2ObjectArray(mSrc.getDb().queryColumn(Long.class, "SELECT id FROM cards", 0));
+        } else {
+            cids = mSrc.getDecks().cids(mDid, true);
+        }
         // attach dst to src so we can copy data between them. This isn't done in original libanki as Python more
         // flexible
         dst.close();
@@ -180,7 +165,7 @@ class AnkiExporter extends Exporter {
         }
         JSONObject dconfs = new JSONObject();
         for (JSONObject d : mSrc.getDecks().all()) {
-            if ("1".equals(d.getString("id"))) {
+            if (d.getString("id").equals("1")) {
                 continue;
             }
             if (mDid != null && !dids.contains(d.getLong("id"))) {
@@ -191,13 +176,11 @@ class AnkiExporter extends Exporter {
                     dconfs.put(Long.toString(d.getLong("conf")), true);
                 }
             }
-
-            JSONObject destinationDeck = d.deepClone();
             if (!mIncludeSched) {
                 // scheduling not included, so reset deck settings to default
-                destinationDeck.put("conf", 1);
+                d.put("conf", 1);
             }
-            dst.getDecks().update(destinationDeck);
+            dst.getDecks().update(d);
         }
         // copy used deck confs
         Timber.d("Copy deck options");
@@ -217,23 +200,16 @@ class AnkiExporter extends Exporter {
                     "select flds from notes where id in " + strnids, 0);
             for (int idx = 0; idx < mid.size(); idx++) {
                 for (String file : mSrc.getMedia().filesInStr(mid.get(idx), flds.get(idx))) {
-                    // skip files in subdirs
-                    if (file.contains(File.separator)) {
-                        continue;
-                    }
                     media.put(file, true);
                 }
             }
             if (mMediaDir != null) {
                 for (File f : new File(mMediaDir).listFiles()) {
-                    if (f.isDirectory()) {
-                        continue;
-                    }
                     String fname = f.getName();
                     if (fname.startsWith("_")) {
                         // Loop through every model that will be exported, and check if it contains a reference to f
-                        for (JSONObject model : mSrc.getModels().all()) {
-                            if (_modelHasMedia(model, fname)) {
+                        for (int idx = 0; idx < mid.size(); idx++) {
+                            if (_modelHasMedia(mSrc.getModels().get(idx), fname)) {
                                 media.put(fname, true);
                                 break;
                             }
@@ -289,10 +265,9 @@ class AnkiExporter extends Exporter {
 
 
     /**
-     * override to apply customizations to the deck before it's closed, such as update the deck description
+     * overwrite to apply customizations to the deck before it's closed, such as update the deck description
      */
     protected void postExport() {
-        // do nothing
     }
 
 
@@ -326,17 +301,13 @@ public final class AnkiPackageExporter extends AnkiExporter {
 
 
     @Override
-    public void exportInto(String path, Context context) throws IOException, JSONException, ImportExportException {
-        // sched info+v2 scheduler not compatible w/ older clients
-        Timber.i("Starting export into %s", path);
-        _v2sched = mCol.schedVer() != 1 && mIncludeSched;
-
+    public void exportInto(String path, Context context) throws IOException, JSONException {
         // open a zip file
         ZipFile z = new ZipFile(path);
         // if all decks and scheduling included, full export
         JSONObject media;
         if (mIncludeSched && mDid == null) {
-            media = exportVerbatim(z, context);
+            media = exportVerbatim(z);
         } else {
             // otherwise, filter
             media = exportFiltered(z, path, context);
@@ -347,74 +318,65 @@ public final class AnkiPackageExporter extends AnkiExporter {
     }
 
 
-    private JSONObject exportVerbatim(ZipFile z, Context context) throws IOException {
+    private JSONObject exportVerbatim(ZipFile z) throws IOException {
         // close our deck & write it into the zip file, and reopen
         mCount = mCol.cardCount();
         mCol.close();
-        if (!_v2sched) {
-            z.write(mCol.getPath(), CollectionHelper.COLLECTION_FILENAME);
-        } else {
-            _addDummyCollection(z, context);
-            z.write(mCol.getPath(), "collection.anki21");
-        }
-
+        z.write(mCol.getPath(), "collection.anki2");
         mCol.reopen();
         // copy all media
+        JSONObject media = new JSONObject();
         if (!mIncludeMedia) {
-            return new JSONObject();
+            return media;
         }
         File mdir = new File(mCol.getMedia().dir());
         if (mdir.exists() && mdir.isDirectory()) {
             File[] mediaFiles = mdir.listFiles();
-            return _exportMedia(z, mediaFiles);
-        } else {
-            return new JSONObject();
-        }
-    }
-
-    private JSONObject _exportMedia(ZipFile z, ArrayList<String> fileNames, String mdir) throws IOException {
-        int size = fileNames.size();
-        int i = 0;
-        File[] files = new File[size];
-        for (String fileName: fileNames){
-            files[i++] = new File(mdir, fileName);
-        }
-        return _exportMedia(z, files);
-    }
-
-    private JSONObject _exportMedia(ZipFile z, File[] files) throws IOException {
-        int c = 0;
-        JSONObject media = new JSONObject();
-        for (File file : files) {
-            // todo: deflate SVG files, as in dae/anki@a5b0852360b132c0d04094f5ca8f1933f64d7c7e
-            z.write(file.getPath(), Integer.toString(c));
-            try {
-                media.put(Integer.toString(c), file.getName());
-                c++;
-            } catch (JSONException e) {
-                e.printStackTrace();
+            int c = 0;
+            for (File f : mediaFiles) {
+                z.write(f.getPath(), Integer.toString(c));
+                try {
+                    media.put(Integer.toString(c), f.getName());
+                    c++;
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
         }
         return media;
     }
 
 
-    private JSONObject exportFiltered(ZipFile z, String path, Context context) throws IOException, JSONException, ImportExportException {
+    private JSONObject exportFiltered(ZipFile z, String path, Context context) throws IOException, JSONException {
         // export into the anki2 file
         String colfile = path.replace(".apkg", ".anki2");
-
-        if (_v2sched) {
-            throw new ImportExportException(context.getString(R.string.export_v2_forbidden));
-        }
-
         super.exportInto(colfile, context);
-        z.write(colfile, CollectionHelper.COLLECTION_FILENAME);
+        z.write(colfile, "collection.anki2");
         // and media
         prepareMedia();
-    	JSONObject media = _exportMedia(z, mMediaFiles, mCol.getMedia().dir());
+        JSONObject media = new JSONObject();
+        File mdir = new File(mCol.getMedia().dir());
+        if (mdir.exists() && mdir.isDirectory()) {
+            int c = 0;
+            for (String file : mMediaFiles) {
+                File mpath = new File(mdir,file);
+                if (mpath.exists()) {
+                    z.write(mpath.getPath(), Integer.toString(c));
+                }
+                try {
+                    media.put(Integer.toString(c), file);
+                    c++;
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
         // tidy up intermediate files
-        SQLiteDatabase.deleteDatabase(new File(colfile));
-        SQLiteDatabase.deleteDatabase(new File(path.replace(".apkg", ".media.ad.db2")));
+        new File(colfile).delete();
+        String p = path.replace(".apkg", ".media.ad.db2");
+        if (new File(p).exists()) {
+            new File(p).delete();
+        }
         String tempPath = path.replace(".apkg", ".media");
         File file = new File(tempPath);
         if (file.exists()) {
@@ -433,23 +395,6 @@ public final class AnkiPackageExporter extends AnkiExporter {
         // chance to move each file in self.mediaFiles into place before media
         // is zipped up
     }
-
-    // create a dummy collection to ensure older clients don't try to read
-    // data they don't understand
-    private void _addDummyCollection(ZipFile zip, Context context) throws IOException {
-        File f = File.createTempFile("dummy", ".anki2");
-        String path = f.getAbsolutePath();
-        f.delete();
-        Collection c = Storage.Collection(context, path);
-        Note n = c.newNote();
-        //The created dummy collection only contains the StdModels.
-        //The field names for those are localised during creation, so we need to consider that when creating dummy note
-        n.setItem(context.getString(R.string.front_field_name), context.getString(R.string.export_v2_dummy_note));
-        c.addNote(n);
-        c.save();
-        c.close();
-        zip.write(f.getAbsolutePath(), CollectionHelper.COLLECTION_FILENAME);
-    }
 }
 
 
@@ -460,18 +405,18 @@ public final class AnkiPackageExporter extends AnkiExporter {
  * @author Tim
  */
 class ZipFile {
-    private final int BUFFER_SIZE = 1024;
-    private ZipArchiveOutputStream mZos;
+    final int BUFFER_SIZE = 1024;
+    private ZipOutputStream mZos;
 
 
     public ZipFile(String path) throws FileNotFoundException {
-        mZos = new ZipArchiveOutputStream(new BufferedOutputStream(new FileOutputStream(path)));
+        mZos = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(path)));
     }
 
 
     public void write(String path, String entry) throws IOException {
         BufferedInputStream bis = new BufferedInputStream(new FileInputStream(path), BUFFER_SIZE);
-        ZipArchiveEntry ze = new ZipArchiveEntry(entry);
+        ZipEntry ze = new ZipEntry(entry);
         writeEntry(bis, ze);
     }
 
@@ -480,19 +425,19 @@ class ZipFile {
         // TODO: Does this work with abnormal characters?
         InputStream is = new ByteArrayInputStream(value.getBytes());
         BufferedInputStream bis = new BufferedInputStream(is, BUFFER_SIZE);
-        ZipArchiveEntry ze = new ZipArchiveEntry(entry);
+        ZipEntry ze = new ZipEntry(entry);
         writeEntry(bis, ze);
     }
 
 
-    private void writeEntry(BufferedInputStream bis, ZipArchiveEntry ze) throws IOException {
+    private void writeEntry(BufferedInputStream bis, ZipEntry ze) throws IOException {
         byte[] buf = new byte[BUFFER_SIZE];
-        mZos.putArchiveEntry(ze);
+        mZos.putNextEntry(ze);
         int len;
         while ((len = bis.read(buf, 0, BUFFER_SIZE)) != -1) {
             mZos.write(buf, 0, len);
         }
-        mZos.closeArchiveEntry();
+        mZos.closeEntry();
         bis.close();
     }
 

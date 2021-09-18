@@ -21,7 +21,8 @@ package com.ichi2.themes;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.TypedArray;
-import androidx.core.content.ContextCompat;
+import android.support.v4.content.ContextCompat;
+import android.widget.Toast;
 
 import com.ichi2.anki.AnkiDroidApp;
 import com.ichi2.anki.R;
@@ -32,11 +33,11 @@ public class Themes {
     public final static int ALPHA_ICON_ENABLED_DARK = 138; // 54%
 
     // Day themes
-    public final static int THEME_DAY_LIGHT = 0;
-    public final static int THEME_DAY_PLAIN = 1;
+    private final static int THEME_DAY_LIGHT = 0;
+    private final static int THEME_DAY_PLAIN = 1;
     // Night themes
-    public final static int THEME_NIGHT_BLACK = 0;
-    public final static int THEME_NIGHT_DARK = 1;
+    private final static int THEME_NIGHT_BLACK = 0;
+    private final static int THEME_NIGHT_DARK = 1;
 
 
     public static void setTheme(Context context) {

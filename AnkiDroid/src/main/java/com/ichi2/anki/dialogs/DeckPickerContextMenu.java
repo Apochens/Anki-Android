@@ -18,6 +18,7 @@ package com.ichi2.anki.dialogs;
 import android.app.Dialog;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.v4.app.DialogFragment;
 import android.view.View;
 
 import com.afollestad.materialdialogs.MaterialDialog;
@@ -26,7 +27,6 @@ import com.ichi2.anki.CollectionHelper;
 import com.ichi2.anki.DeckPicker;
 import com.ichi2.anki.R;
 import com.ichi2.anki.StudyOptionsFragment;
-import com.ichi2.anki.analytics.AnalyticsDialogFragment;
 import com.ichi2.libanki.Collection;
 
 import java.util.ArrayList;
@@ -34,7 +34,7 @@ import java.util.HashMap;
 
 import timber.log.Timber;
 
-public class DeckPickerContextMenu extends AnalyticsDialogFragment {
+public class DeckPickerContextMenu extends DialogFragment {
     /**
      * Context Menus
      */
@@ -46,7 +46,6 @@ public class DeckPickerContextMenu extends AnalyticsDialogFragment {
     private static final int CONTEXT_MENU_UNBURY = 5;
     private static final int CONTEXT_MENU_CUSTOM_STUDY_REBUILD = 6;
     private static final int CONTEXT_MENU_CUSTOM_STUDY_EMPTY = 7;
-    private static final int CONTEXT_MENU_CREATE_SUBDECK = 8;
 
 
     public static DeckPickerContextMenu newInstance(long did) {
@@ -86,7 +85,6 @@ public class DeckPickerContextMenu extends AnalyticsDialogFragment {
         keyValueMap.put(CONTEXT_MENU_UNBURY, res.getString(R.string.unbury));
         keyValueMap.put(CONTEXT_MENU_CUSTOM_STUDY_REBUILD, res.getString(R.string.rebuild_cram_label));
         keyValueMap.put(CONTEXT_MENU_CUSTOM_STUDY_EMPTY, res.getString(R.string.empty_cram_label));
-        keyValueMap.put(CONTEXT_MENU_CREATE_SUBDECK, res.getString(R.string.create_subdeck));
         return keyValueMap;
     }
 
@@ -103,7 +101,6 @@ public class DeckPickerContextMenu extends AnalyticsDialogFragment {
             itemIds.add(CONTEXT_MENU_CUSTOM_STUDY_EMPTY);
         }
         itemIds.add(CONTEXT_MENU_RENAME_DECK);
-        itemIds.add(CONTEXT_MENU_CREATE_SUBDECK);
         itemIds.add(CONTEXT_MENU_DECK_OPTIONS);
         if (!col.getDecks().isDyn(did)) {
             itemIds.add(CONTEXT_MENU_CUSTOM_STUDY);
@@ -168,11 +165,6 @@ public class DeckPickerContextMenu extends AnalyticsDialogFragment {
                     Timber.i("Empty deck selected");
                     ((DeckPicker) getActivity()).emptyFiltered();
                     ((AnkiActivity) getActivity()).dismissAllDialogFragments();
-                    break;
-                }
-                case CONTEXT_MENU_CREATE_SUBDECK: {
-                    Timber.i("Create Subdeck selected");
-                    ((DeckPicker) getActivity()).createSubdeckDialog();
                     break;
                 }
             }

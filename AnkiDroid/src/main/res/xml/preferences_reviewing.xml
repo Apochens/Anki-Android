@@ -27,9 +27,11 @@
     android:summary="@string/pref_cat_reviewing_summ" >
     <PreferenceCategory android:title="@string/pref_cat_reviewer_behaviour" >
         <ListPreference
+            android:defaultValue=""
             android:entries="@array/new_spread_labels"
             android:entryValues="@array/new_spread_values"
             android:key="newSpread"
+            android:summary=""
             android:title="@string/new_spread" />
         <com.ichi2.ui.SeekBarPreference
             android:key="dayOffset"
@@ -64,6 +66,7 @@
         <ListPreference
             android:defaultValue="0"
             android:key="fullscreenMode"
+            android:summary=""
             android:entries="@array/full_screen_mode_labels"
             android:entryValues="@array/full_screen_mode_values"
             android:title="@string/fullscreen_review" />
@@ -103,26 +106,10 @@
             android:title="@string/button_size"
             app:interval="10"
             app:min="100" />
-        <ListPreference
-            android:defaultValue="bottom"
-            android:entries="@array/answer_buttons_position_labels"
-            android:entryValues="@array/answer_buttons_position"
-            android:key="@string/answer_buttons_position_preference"
-            android:title="@string/answer_buttons_position" />
-        <CheckBoxPreference
-            android:key="showTopbar"
-            android:defaultValue="true"
-            android:summary="@string/show_top_bar_summ"
-            android:title="@string/show_top_bar" />
         <CheckBoxPreference
             android:key="showProgress"
             android:summary="@string/show_progress_summ"
             android:title="@string/show_progress" />
-        <CheckBoxPreference
-            android:key="showETA"
-            android:defaultValue="true"
-            android:summary="@string/show_eta_summ"
-            android:title="@string/show_eta" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/pref_cat_whiteboard" >
         <com.ichi2.ui.SeekBarPreference
@@ -146,7 +133,7 @@
             android:summary="@string/timeout_answer_summ"
             android:title="@string/timeout_answer_text" />
         <com.ichi2.ui.SeekBarPreference
-            android:defaultValue="20"
+            android:defaultValue="6"
             android:dependency="timeoutAnswer"
             android:key="timeoutAnswerSeconds"
             android:max="30"

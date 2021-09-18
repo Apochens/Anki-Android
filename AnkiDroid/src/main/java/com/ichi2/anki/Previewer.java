@@ -22,54 +22,31 @@ import android.os.Bundle;
 import android.view.View;
 
 import com.ichi2.libanki.Collection;
-import com.ichi2.themes.Themes;
 
 import timber.log.Timber;
 
-/**
- * The previewer intent must supply an array of cards to show and the index in the list from where
- * to begin showing them. Special rules are applied if the list size is 1 (i.e., no scrolling
- * buttons will be shown).
- */
 public class Previewer extends AbstractFlashcardViewer {
-    private long[] mCardList;
-    private int mIndex;
-    private boolean mShowingAnswer;
+    Long mCurrentCardId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Timber.d("onCreate()");
-        super.onCreate(savedInstanceState);
-
-        mCardList = getIntent().getLongArrayExtra("cardList");
-        mIndex = getIntent().getIntExtra("index", -1);
-
-        if (savedInstanceState != null){
-            mIndex = savedInstanceState.getInt("index", mIndex);
-            mShowingAnswer = savedInstanceState.getBoolean("showingAnswer", mShowingAnswer);
-        }
-
-        if (mCardList.length == 0 || mIndex < 0 || mIndex > mCardList.length - 1) {
-            Timber.e("Previewer started with empty card list or invalid index");
+        mCurrentCardId=getIntent().getLongExtra("currentCardId", -1);
+        if (mCurrentCardId == -1) {
+            Timber.e("Previewer started without a valid card ID");
             finishWithoutAnimation();
-            return;
         }
+        super.onCreate(savedInstanceState);
         showBackIcon();
         // Ensure navigation drawer can't be opened. Various actions in the drawer cause crashes.
         disableDrawerSwipe();
-        startLoadingCollection();
     }
 
     @Override
     protected void onCollectionLoaded(Collection col) {
         super.onCollectionLoaded(col);
-        mCurrentCard = col.getCard(mCardList[mIndex]);
-        if (mShowingAnswer){
-            displayCardQuestion();
-            displayCardAnswer();
-        } else {
-            displayCardQuestion();
-        }
+        mCurrentCard = col.getCard(mCurrentCardId);
+        displayCardQuestion();
         showBackIcon();
     }
 
@@ -87,115 +64,24 @@ public class Previewer extends AbstractFlashcardViewer {
     }
 
 
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        outState.putLongArray("cardList", mCardList);
-        outState.putInt("index", mIndex);
-        outState.putBoolean("showingAnswer", mShowingAnswer);
-        super.onSaveInstanceState(outState);
-    }
-
-
-    @Override
-    protected void displayCardQuestion() {
-        super.displayCardQuestion();
-        mShowingAnswer = false;
-        updateButtonState();
-    }
-
-
     // Called via mFlipCardListener in parent class when answer button pressed
     @Override
     protected void displayCardAnswer() {
         super.displayCardAnswer();
-        mShowingAnswer = true;
-        updateButtonState();
+        findViewById(R.id.answer_options_layout).setVisibility(View.GONE);
+        mFlipCardLayout.setVisibility(View.GONE);
+        hideEaseButtons();
     }
 
 
     // we don't want the Activity title to be changed.
     @Override
-    protected void updateScreenCounts() { /* do nothing */ }
-
-
-    @Override
-    public boolean executeCommand(int which) {
-        /* do nothing */
-        return false;
+    protected void updateScreenCounts() {
     }
 
-    private View.OnClickListener mSelectScrollHandler = new View.OnClickListener() {
-        @Override
-        public void onClick(View view) {
-            if (mShowingAnswer) {
-                // If we are showing the answer, any click will show a question...
-                if (view.getId() == R.id.flashcard_layout_ease2) {
-                    // ...but if they clicked "forward" we need to move to the next card first
-                    mIndex++;
-                    mCurrentCard = getCol().getCard(mCardList[mIndex]);
-                }
-                displayCardQuestion();
-            } else {
-                // If we are showing the question, any click will show an answer...
-                if (view.getId() == R.id.flashcard_layout_ease1) {
-                    // ...but if they clicked "reverse" we need to go to the previous card first
-                    mIndex--;
-                    mCurrentCard = getCol().getCard(mCardList[mIndex]);
-                }
-                displayCardAnswer();
-            }
-        }
-    };
 
-    private void updateButtonState() {
-        // If we are in single-card mode, we show the "Show Answer" button on the question side
-        // and hide all the buttons on the answer side.
-        if (mCardList.length == 1) {
-            if (!mShowingAnswer) {
-                mFlipCardLayout.setVisibility(View.VISIBLE);
-            } else {
-                findViewById(R.id.answer_options_layout).setVisibility(View.GONE);
-                mFlipCardLayout.setVisibility(View.GONE);
-                hideEaseButtons();
-            }
-            return;
-        }
-
-        mFlipCardLayout.setVisibility(View.GONE);
-        mEase1Layout.setVisibility(View.VISIBLE);
-        mEase2Layout.setVisibility(View.VISIBLE);
-        mEase3Layout.setVisibility(View.GONE);
-        mEase4Layout.setVisibility(View.GONE);
-
-        final int[] background = Themes.getResFromAttr(this, new int[]{R.attr.hardButtonRef});
-        final int[] textColor = Themes.getColorFromAttr(this, new int[]{R.attr.hardButtonTextColor});
-
-        mNext1.setTextSize(30);
-        mEase1.setVisibility(View.GONE);
-        mNext1.setTextColor(textColor[0]);
-        mEase1Layout.setOnClickListener(mSelectScrollHandler);
-        mEase1Layout.setBackgroundResource(background[0]);
-
-        mNext2.setTextSize(30);
-        mEase2.setVisibility(View.GONE);
-        mNext2.setTextColor(textColor[0]);
-        mEase2Layout.setOnClickListener(mSelectScrollHandler);
-        mEase2Layout.setBackgroundResource(background[0]);
-
-        if (mIndex == 0 && !mShowingAnswer) {
-            mEase1Layout.setEnabled(false);
-            mNext1.setText("-");
-        } else {
-            mEase1Layout.setEnabled(true);
-            mNext1.setText("<");
-        }
-
-        if (mIndex == mCardList.length - 1 && mShowingAnswer) {
-            mEase2Layout.setEnabled(false);
-            mNext2.setText("-");
-        } else {
-            mEase2Layout.setEnabled(true);
-            mNext2.setText(">");
-        }
+    // No Gestures!
+    @Override
+    protected void executeCommand(int which) {
     }
 }

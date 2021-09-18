@@ -18,14 +18,16 @@ package com.ichi2.anki.stats;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.os.AsyncTask;
+import android.support.v4.view.ViewPager;
 import android.view.View;
 import android.webkit.WebView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.ichi2.anki.R;
+import com.ichi2.anki.Statistics;
 import com.ichi2.libanki.Collection;
-import com.ichi2.libanki.stats.Stats;
+import com.ichi2.libanki.Stats;
 import com.ichi2.themes.Themes;
 import com.wildplot.android.rendering.PlotSheet;
 
@@ -43,7 +45,7 @@ public class AnkiStatsTaskHandler {
     private Collection mCollectionData;
     private float mStandardTextSize = 10f;
     private Stats.AxisType mStatType = Stats.AxisType.TYPE_MONTH;
-    private long mDeckId;
+    private boolean mIsWholeCollection = false;
     private static Lock sLock = new ReentrantLock();
 
 
@@ -52,8 +54,8 @@ public class AnkiStatsTaskHandler {
         mCollectionData = collection;
     }
 
-    public void setDeckId(long deckId) {
-        mDeckId = deckId;
+    public void setIsWholeCollection(boolean wholeCollection) {
+        mIsWholeCollection = wholeCollection;
     }
 
     public static AnkiStatsTaskHandler getInstance() {
@@ -104,7 +106,7 @@ public class AnkiStatsTaskHandler {
                 mImageView = (ChartView) params[0];
                 mProgressBar = (ProgressBar) params[1];
                 ChartBuilder chartBuilder = new ChartBuilder(mImageView, mCollectionData,
-                        mDeckId, mChartType);
+                        mIsWholeCollection, mChartType);
                 return chartBuilder.renderChart(mStatType);
             } finally {
                 sLock.unlock();
@@ -152,7 +154,7 @@ public class AnkiStatsTaskHandler {
                 }
                 mWebView = (WebView) params[0];
                 mProgressBar = (ProgressBar) params[1];
-                OverviewStatsBuilder overviewStatsBuilder = new OverviewStatsBuilder(mWebView, mCollectionData, mDeckId, mStatType);
+                OverviewStatsBuilder overviewStatsBuilder = new OverviewStatsBuilder(mWebView, mCollectionData, mIsWholeCollection, mStatType);
                 return overviewStatsBuilder.createInfoHtmlString();
             } finally {
                 sLock.unlock();
@@ -216,7 +218,7 @@ public class AnkiStatsTaskHandler {
                 try {
                     cur = collection.getDb()
                             .getDatabase()
-                            .query(query, null);
+                            .rawQuery(query, null);
 
                     cur.moveToFirst();
                     cards = cur.getInt(0);
@@ -226,8 +228,8 @@ public class AnkiStatsTaskHandler {
                         cur.close();
                     }
                 }
-                Resources res = mTextView.getResources();
-                final String span = res.getQuantityString(R.plurals.in_minutes, minutes, minutes);
+                Resources res = collection.getContext().getResources();
+                final String span = res.getQuantityString(R.plurals.time_span_minutes, minutes, minutes);
                 return res.getQuantityString(R.plurals.studied_cards_today, cards, cards, span);
             } finally {
                 sLock.unlock();

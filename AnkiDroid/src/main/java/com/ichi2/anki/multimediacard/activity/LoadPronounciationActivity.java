@@ -20,6 +20,7 @@
 package com.ichi2.anki.multimediacard.activity;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
@@ -27,6 +28,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -50,7 +52,6 @@ import java.util.Locale;
  * User picks a source language and the source is passed as extra.
  * <p>
  * When activity finished, it passes the filepath as another extra to the caller.
- * FIXME why isn't this extending AnkiActivity?
  */
 public class LoadPronounciationActivity extends Activity implements OnCancelListener {
 
@@ -64,16 +65,20 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
 
     private String mTranslationAddress;
 
-    @SuppressWarnings("deprecation") // tracked in github as #5020
-    private android.app.ProgressDialog progressDialog = null;
+    private ProgressDialog progressDialog = null;
+
+    private String mTranslation;
 
     private String mPronunciationAddress;
+
+    private String mPronunciationPage;
 
     private String mMp3Address;
 
     private LoadPronounciationActivity mActivity;
     private LanguageListerBeolingus mLanguageLister;
     private Spinner mSpinnerFrom;
+    private Button mSaveButton;
 
     private BackgroundPost mPostTranslation = null;
     private BackgroundPost mPostPronunciation = null;
@@ -97,9 +102,9 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
         setContentView(R.layout.activity_load_pronounciation);
         mSource = getIntent().getExtras().getString(EXTRA_SOURCE);
 
-        LinearLayout linearLayout = findViewById(R.id.layoutInLoadPronActivity);
+        LinearLayout linearLayout = (LinearLayout) findViewById(R.id.layoutInLoadPronActivity);
 
-        mLanguageLister = new LanguageListerBeolingus();
+        mLanguageLister = new LanguageListerBeolingus(this);
 
         mSpinnerFrom = new Spinner(this);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item,
@@ -111,12 +116,27 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
         Button buttonLoadPronunciation = new Button(this);
         buttonLoadPronunciation.setText(gtxt(R.string.multimedia_editor_pron_load));
         linearLayout.addView(buttonLoadPronunciation);
-        buttonLoadPronunciation.setOnClickListener(v -> onLoadPronunciation(v));
-        Button mSaveButton = new Button(this);
+        buttonLoadPronunciation.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                onLoadPronunciation(v);
+
+            }
+        });
+
+        mSaveButton = new Button(this);
         mSaveButton.setText("Save");
-        mSaveButton.setOnClickListener(v -> { });
+        mSaveButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+            }
+        });
         mActivity = this;
+
         mStopped = false;
+
     }
 
 
@@ -155,12 +175,11 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
     }
 
 
-    @SuppressWarnings("deprecation") // ProgressDialog change tracked in github as #5020
     private void showProgressDialog(String message) {
 
         dismissCarefullyProgressDialog();
 
-        progressDialog = android.app.ProgressDialog.show(this, gtxt(R.string.multimedia_editor_progress_wait_title), message, true,
+        progressDialog = ProgressDialog.show(this, gtxt(R.string.multimedia_editor_progress_wait_title), message, true,
                 false);
         progressDialog.setCancelable(true);
         progressDialog.setOnCancelListener(this);
@@ -257,15 +276,19 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
         // Means we get the page with the word translation,
         // And we have to start fetching the page with pronunciation
         if (post.getAddress().contentEquals(mTranslationAddress)) {
+            mTranslation = result;
 
-            if (result.startsWith("FAILED")) {
+            if (mTranslation.startsWith("FAILED")) {
+
                 failNoPronunciation();
+
                 return;
             }
 
-            mPronunciationAddress = BeolingusParser.getPronunciationAddressFromTranslation(result, mSource);
+            mPronunciationAddress = BeolingusParser.getPronounciationAddressFromTranslation(mTranslation, mSource);
 
             if (mPronunciationAddress.contentEquals("no")) {
+
                 failNoPronunciation();
 
                 if (!mSource.toLowerCase(Locale.getDefault()).contentEquals(mSource)) {
@@ -295,7 +318,9 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
         if (post.getAddress().contentEquals(mPronunciationAddress)) {
             // else here = pronunciation post returned;
 
-            mMp3Address = BeolingusParser.getMp3AddressFromPronounciation(result);
+            mPronunciationPage = result;
+
+            mMp3Address = BeolingusParser.getMp3AddressFromPronounciation(mPronunciationPage);
 
             if (mMp3Address.contentEquals("no")) {
                 failNoPronunciation();
@@ -312,7 +337,11 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
                 progressDialog.dismiss();
                 showToast(gtxt(R.string.multimedia_editor_something_wrong));
             }
+
+            return;
+
         }
+
     }
 
 
@@ -333,11 +362,17 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
         }
 
         progressDialog.dismiss();
+
         showToast(gtxt(R.string.multimedia_editor_general_done));
+
         Intent resultData = new Intent();
+
         resultData.putExtra(EXTRA_PRONUNCIATION_FILE_PATH, result);
+
         setResult(RESULT_OK, resultData);
+
         finish();
+
     }
 
 
@@ -370,7 +405,7 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
 
     private String computeAddressOfTranslationPage() {
         // Service name has to be replaced from the language lister.
-        String address = "https://dict.tu-chemnitz.de/dings.cgi?lang=en&service=SERVICE&opterrors=0&optpro=0&query=Welt";
+        String address = "http://dict.tu-chemnitz.de/dings.cgi?lang=en&service=SERVICE&opterrors=0&optpro=0&query=Welt";
 
         String strFrom = mSpinnerFrom.getSelectedItem().toString();
         String langCodeFrom = mLanguageLister.getCodeFor(strFrom);
@@ -407,18 +442,25 @@ public class LoadPronounciationActivity extends Activity implements OnCancelList
     @Override
     public void onCancel(DialogInterface dialog) {
         mStopped = true;
+
         dismissCarefullyProgressDialog();
+
         stopAllTasks();
+
         Intent resultData = new Intent();
+
         setResult(RESULT_CANCELED, resultData);
+
         finish();
     }
 
 
     private void dismissCarefullyProgressDialog() {
         try {
-            if ((progressDialog != null) && progressDialog.isShowing()) {
+            if (progressDialog != null) {
+                if (progressDialog.isShowing()) {
                     progressDialog.dismiss();
+                }
             }
         } catch (Exception e) {
             // nothing is done intentionally

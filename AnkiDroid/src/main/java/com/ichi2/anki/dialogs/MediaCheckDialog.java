@@ -15,11 +15,19 @@ public class MediaCheckDialog extends AsyncDialogFragment {
     public static final int DIALOG_MEDIA_CHECK_RESULTS = 1;
 
     public interface MediaCheckDialogListener {
-        void showMediaCheckDialog(int dialogType);
-        void showMediaCheckDialog(int dialogType, List<List<String>> checkList);
-        void mediaCheck();
-        void deleteUnused(List<String> unused);
-        void dismissAllDialogFragments();
+        public void showMediaCheckDialog(int dialogType);
+
+
+        public void showMediaCheckDialog(int dialogType, List<List<String>> checkList);
+
+
+        public void mediaCheck();
+
+
+        public void deleteUnused(List<String> unused);
+
+
+        public void dismissAllDialogFragments();
     }
 
 
@@ -51,21 +59,27 @@ public class MediaCheckDialog extends AsyncDialogFragment {
         builder.title(getNotificationTitle());
 
         switch (getArguments().getInt("dialogType")) {
-            case DIALOG_CONFIRM_MEDIA_CHECK: {
+            case DIALOG_CONFIRM_MEDIA_CHECK:
                 return builder.content(getNotificationMessage())
                         .positiveText(res().getString(R.string.dialog_ok))
                         .negativeText(res().getString(R.string.dialog_cancel))
                         .cancelable(true)
-                        .onPositive((dialog, which) -> {
-                            ((MediaCheckDialogListener) getActivity()).mediaCheck();
-                            ((MediaCheckDialogListener) getActivity())
-                                    .dismissAllDialogFragments();
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                ((MediaCheckDialogListener) getActivity()).mediaCheck();
+                                ((MediaCheckDialogListener) getActivity())
+                                        .dismissAllDialogFragments();
+                            }
+
+                            @Override
+                            public void onNegative(MaterialDialog dialog) {
+                                ((MediaCheckDialogListener) getActivity())
+                                        .dismissAllDialogFragments();
+                            }
                         })
-                        .onNegative((dialog, which) -> ((MediaCheckDialogListener) getActivity())
-                                .dismissAllDialogFragments())
                         .show();
-            }
-            case DIALOG_MEDIA_CHECK_RESULTS: {
+            case DIALOG_MEDIA_CHECK_RESULTS:
                 final ArrayList<String> nohave = getArguments().getStringArrayList("nohave");
                 final ArrayList<String> unused = getArguments().getStringArrayList("unused");
                 final ArrayList<String> invalid = getArguments().getStringArrayList("invalid");
@@ -102,18 +116,29 @@ public class MediaCheckDialog extends AsyncDialogFragment {
                 if (unused.size() > 0) {
                     builder.positiveText(res().getString(R.string.dialog_ok))
                             .negativeText(res().getString(R.string.check_media_delete_unused))
-                            .onPositive((dialog, which) -> ((MediaCheckDialogListener) getActivity())
-                                    .dismissAllDialogFragments())
-                            .onNegative((dialog, which) -> {
-                                ((MediaCheckDialogListener) getActivity()).deleteUnused(unused);
-                                dismissAllDialogFragments();
+                            .callback(new MaterialDialog.ButtonCallback() {
+                                @Override
+                                public void onPositive(MaterialDialog dialog) {
+                                    ((MediaCheckDialogListener) getActivity())
+                                            .dismissAllDialogFragments();
+                                }
+
+                                @Override
+                                public void onNegative(MaterialDialog dialog) {
+                                    ((MediaCheckDialogListener) getActivity()).deleteUnused(unused);
+                                    dismissAllDialogFragments();
+                                }
                             });
                 } else {
                     builder.positiveText(res().getString(R.string.dialog_ok))
-                            .onPositive((dialog, which) -> ((MediaCheckDialogListener) getActivity()).dismissAllDialogFragments());
+                            .callback(new MaterialDialog.ButtonCallback() {
+                                @Override
+                                public void onPositive(MaterialDialog dialog) {
+                                    ((MediaCheckDialogListener) getActivity()).dismissAllDialogFragments();
+                                }
+                            });
                 }
                 return builder.show();
-            }
             default:
                 return null;
         }

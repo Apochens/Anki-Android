@@ -20,10 +20,12 @@ import com.wildplot.android.parsing.ExpressionFormatException;
 import com.wildplot.android.parsing.TreeElement;
 
 public class NumberAtom implements TreeElement {
+    public Atom.AtomType getAtomType() {
+        return atomType;
+    }
 
     private Atom.AtomType atomType = Atom.AtomType.NUMBER;
     private Double value;
-
 
     public NumberAtom(String factorString) {
         try {
@@ -34,28 +36,19 @@ public class NumberAtom implements TreeElement {
 
     }
 
-
-    public Atom.AtomType getAtomType() {
-        return atomType;
-    }
-
-
     @Override
-    public double getValue() throws ExpressionFormatException {
-        if (atomType != Atom.AtomType.INVALID) {
+    public double getValue() throws ExpressionFormatException{
+        if (atomType != Atom.AtomType.INVALID)
             return value;
-        } else {
+        else
             throw new ExpressionFormatException("Number is Invalid, cannot parse");
-        }
     }
 
-
     @Override
-    public boolean isVariable() throws ExpressionFormatException {
-        if (atomType != Atom.AtomType.INVALID) {
+    public boolean isVariable() throws ExpressionFormatException{
+        if (atomType != Atom.AtomType.INVALID)
             return false;
-        } else {
+        else
             throw new ExpressionFormatException("Number is Invalid, cannot parse");
-        }
     }
 }

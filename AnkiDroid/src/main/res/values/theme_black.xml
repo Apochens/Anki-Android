@@ -6,7 +6,7 @@
     <color name="theme_black_accent">#1565C0</color>
     <color name="theme_black_primary_text">#fff</color> <!-- Alternative: #808080 -->
     <color name="theme_black_secondary_text">#a0a0a0</color>
-    <color name="theme_black_row_current">#1a1a1a</color>
+    <color name="theme_black_row_current">#0c0c0c</color>
 
     <style name="Theme_Dark.Black">
         <!-- Android colors -->
@@ -68,14 +68,7 @@
         <item name="stats_cumulative">@color/material_grey_800</item>
         <!-- Browser colors -->
         <item name="suspendedColor">#A8A634</item>
-        <item name="selectedColor">#a86634</item>
         <item name="markedColor">#391080</item>
-        <item name="flagRed">@color/flag_red</item>
-        <item name="flagOrange">@color/flag_orange</item>
-        <item name="flagGreen">@color/flag_green</item>
-        <item name="flagBlue">@color/flag_blue</item>
-        <!-- Note editor colors -->
-        <item name="duplicateColor">#855</item>
         <!-- FAB -->
         <item name="fab_normal">#ff303030</item>
         <item name="fab_pressed">#c8303030</item> <!-- 55 less opacity than fab_normal -->

@@ -19,22 +19,25 @@
 
 package com.ichi2.anki.multimediacard.language;
 
+import android.content.Context;
+
 import java.util.Locale;
 
 /**
- * This one lister services in beolingus.
+ * This one listers services in beolingus.
  * <p>
  * It is used to load pronunciation.
  */
 public class LanguageListerBeolingus extends LanguageListerBase {
 
-    public LanguageListerBeolingus() {
+    public LanguageListerBeolingus(Context context) {
         super();
 
         addLanguage((new Locale("eng")).getDisplayLanguage() , "en-de");
         addLanguage((new Locale("deu")).getDisplayLanguage(), "deen");
         addLanguage((new Locale("spa")).getDisplayLanguage(), "es-de");
-        addLanguage((new Locale("por")).getDisplayLanguage(), "pt-de");
+        // Seems to have no pronunciation yet
+        // addLanguage(context.getString(R.string.multimedia_editor_languages_portuguese), "pt-de");
     }
 
 }

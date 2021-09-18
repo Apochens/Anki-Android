@@ -3,18 +3,9 @@ body {
   padding: 0px;
 }
 
-.nightMode .latex {
-     filter: invert(100%);
-}
-
-
 body.night_mode {
   color: white;
   background-color: black;
-}
-
-body.ankidroid_dark_mode {
-  background-color: #303030;
 }
 
 #content {
@@ -22,7 +13,7 @@ body.ankidroid_dark_mode {
 }
 
 /* For the typed/correct answer comparison. The typePrompt and typeOff
-  classes are AnkiDroid specific, and used only for older (before
+  classes are AnkiDroid specific, and used only for older (beforer
   4.0) Android versions . typePrompt is a placeholder where the input
   box should be. typeOff is added when the user switched off entering
   the answer. */
@@ -63,10 +54,6 @@ body.ankidroid_dark_mode {
   background-color: #905050;
 }
 
-.ankidroid_dark_mode input#typeans {
-  background-color: #303030;
-}
-
 .replaybutton {
   text-decoration: none;
 }
@@ -78,7 +65,7 @@ zoom into images correctly even with max dimensions specified, so this way is
 preferred over using JavaScript.
 */
 .chrome img {
-  max-width: 100%;
+  max-width: 90%;
   max-height: 90%;
 }
 

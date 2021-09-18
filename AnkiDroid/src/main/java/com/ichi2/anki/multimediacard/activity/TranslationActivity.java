@@ -19,14 +19,17 @@
 
 package com.ichi2.anki.multimediacard.activity;
 
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import androidx.fragment.app.FragmentActivity;
+import android.support.v4.app.FragmentActivity;
 import android.view.Menu;
+import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -55,7 +58,6 @@ import java.util.Locale;
 
 /**
  * Activity used now with Glosbe.com to enable translation of words.
- * FIXME why isn't this extending from our base classes?
  */
 public class TranslationActivity extends FragmentActivity implements DialogInterface.OnClickListener, OnCancelListener {
 
@@ -66,13 +68,12 @@ public class TranslationActivity extends FragmentActivity implements DialogInter
     // Translated result
     public static final String EXTRA_TRANSLATION = "translation.activity.extra.translation";
 
-    private String mSource;
-    private String mTranslation;
+    String mSource;
+    String mTranslation;
     private LanguagesListerGlosbe mLanguageLister;
     private Spinner mSpinnerFrom;
     private Spinner mSpinnerTo;
-    @SuppressWarnings("deprecation") // tracked in github as #5020
-    private android.app.ProgressDialog progressDialog = null;
+    private ProgressDialog progressDialog = null;
     private String mWebServiceAddress;
     private ArrayList<String> mPossibleTranslations;
     private String mLangCodeTo;
@@ -109,7 +110,7 @@ public class TranslationActivity extends FragmentActivity implements DialogInter
         // If translation fails this is a default - source will be returned.
         mTranslation = mSource;
 
-        LinearLayout linearLayout = findViewById(R.id.MainLayoutInTranslationActivity);
+        LinearLayout linearLayout = (LinearLayout) findViewById(R.id.MainLayoutInTranslationActivity);
 
         TextView tv = new TextView(this);
         tv.setText(getText(R.string.multimedia_editor_trans_poweredglosbe));
@@ -119,7 +120,7 @@ public class TranslationActivity extends FragmentActivity implements DialogInter
         tvFrom.setText(getText(R.string.multimedia_editor_trans_from));
         linearLayout.addView(tvFrom);
 
-        mLanguageLister = new LanguagesListerGlosbe();
+        mLanguageLister = new LanguagesListerGlosbe(this);
 
         mSpinnerFrom = new Spinner(this);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item,
@@ -149,14 +150,17 @@ public class TranslationActivity extends FragmentActivity implements DialogInter
         // Setup button
         Button btnDone = new Button(this);
         btnDone.setText(getText(R.string.multimedia_editor_trans_translate));
-        btnDone.setOnClickListener(v -> {
-            // Remember currently selected language
-            String fromLang1 = mSpinnerFrom.getSelectedItem().toString();
-            String toLang1 = mSpinnerTo.getSelectedItem().toString();
-            preferences.edit().putString("translatorLastLanguageFrom", fromLang1).apply();
-            preferences.edit().putString("translatorLastLanguageTo", toLang1).apply();
-            // Get translation
-            translate();
+        btnDone.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Remember currently selected language
+                String fromLang = mSpinnerFrom.getSelectedItem().toString();
+                String toLang = mSpinnerTo.getSelectedItem().toString();
+                preferences.edit().putString("translatorLastLanguageFrom", fromLang).commit();
+                preferences.edit().putString("translatorLastLanguageTo", toLang).commit();
+                // Get translation
+                translate();
+            }
         });
 
         linearLayout.addView(btnDone);
@@ -189,14 +193,13 @@ public class TranslationActivity extends FragmentActivity implements DialogInter
     }
 
 
-    @SuppressWarnings("deprecation") // ProgressDialog change tracked in github as #5020
     protected void translate() {
         if(!Connection.isOnline()) {
             showToast(gtxt(R.string.network_no_connection));
             return;
         }
 
-        progressDialog = android.app.ProgressDialog.show(this, getText(R.string.multimedia_editor_progress_wait_title),
+        progressDialog = ProgressDialog.show(this, getText(R.string.multimedia_editor_progress_wait_title),
                 getText(R.string.multimedia_editor_trans_translating_online), true, false);
 
         progressDialog.setCancelable(true);
@@ -215,7 +218,7 @@ public class TranslationActivity extends FragmentActivity implements DialogInter
 
 
     private String computeAddress() {
-        String address = "https://glosbe.com/gapi/translate?from=FROMLANG&dest=TOLANG&format=json&phrase=SOURCE&pretty=true";
+        String address = "http://glosbe.com/gapi/translate?from=FROMLANG&dest=TOLANG&format=json&phrase=SOURCE&pretty=true";
 
         String strFrom = mSpinnerFrom.getSelectedItem().toString();
         // Conversion to iso, lister created before.
@@ -413,8 +416,10 @@ public class TranslationActivity extends FragmentActivity implements DialogInter
 
     private void dismissCarefullyProgressDialog() {
         try {
-            if ((progressDialog != null) && progressDialog.isShowing()) {
+            if (progressDialog != null) {
+                if (progressDialog.isShowing()) {
                     progressDialog.dismiss();
+                }
             }
         } catch (Exception e) {
             // nothing is done intentionally

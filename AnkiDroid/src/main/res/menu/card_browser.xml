@@ -2,15 +2,15 @@
     xmlns:ankidroid="http://schemas.android.com/apk/res-auto" >
 
     <item
-        android:id="@+id/action_add_note_from_card_browser"
+        android:id="@+id/action_add_card_from_card_browser"
         android:icon="@drawable/ic_add_white_24dp"
-        android:title="@string/note_editor_add_note"
+        android:title="@string/card_editor_add_card"
         ankidroid:showAsAction="ifRoom"/>
     <item
         android:id="@+id/action_search"
         android:icon="@drawable/ic_search_white_24dp"
         android:title="@string/downloaddeck_search"
-        ankidroid:actionViewClass="androidx.appcompat.widget.SearchView"
+        ankidroid:actionViewClass="android.support.v7.widget.SearchView"
         ankidroid:showAsAction="always|collapseActionView"/>
 
     <item
@@ -32,17 +32,4 @@
         android:id="@+id/action_search_by_tag"
         android:title="@string/card_browser_search_by_tag"/>
 
-    <item
-        ankidroid:showAsAction="ifRoom"
-        android:id="@+id/action_undo"
-        android:title="@string/undo"
-        android:icon="@drawable/ic_undo_white_24dp"/>
-
-    <item
-        android:id="@+id/action_preview"
-        android:title="@string/card_editor_preview_card"/>
-
-    <item
-        android:id="@+id/action_select_all"
-        android:title="@string/card_browser_select_all"/>
 </menu>

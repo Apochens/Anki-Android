@@ -18,12 +18,6 @@ package com.ichi2.utils;
 
 import android.os.Looper;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.UiThread;
-import androidx.annotation.WorkerThread;
-
-import timber.log.Timber;
-
 /**
  * Helper class for checking for programming errors while using threads.
  */
@@ -51,7 +45,7 @@ public class Threads {
      * 
      * @param thread on which accesses should occur
      */
-    public static ThreadChecker newSingleThreadChecker(@NonNull Thread thread) {
+    public static ThreadChecker newSingleThreadChecker(Thread thread) {
         if (thread == null) {
             throw new IllegalArgumentException("thread should not be null");
         }
@@ -88,10 +82,9 @@ public class Threads {
     /**
      * Checks that it is called from the main thread and fails if it is called from another thread.
      */
-    @UiThread
     public static void checkMainThread() {
         if (!isOnMainThread()) {
-            Timber.e("must be called on the main thread instead of " + Thread.currentThread());
+            throw new IllegalStateException("must be called on the main thread instead of " + Thread.currentThread());
         }
     }
 
@@ -99,10 +92,9 @@ public class Threads {
     /**
      * Checks that it is not called from the main thread and fails if it is.
      */
-    @WorkerThread
     public static void checkNotMainThread() {
         if (isOnMainThread()) {
-            Timber.e("must not be called on the main thread");
+            throw new IllegalStateException("must not be called on the main thread");
         }
     }
 

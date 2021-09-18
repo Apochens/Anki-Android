@@ -25,6 +25,5 @@ package com.ichi2.anki.multimediacard.fields;
 public enum EFieldType {
     TEXT, // Just text
     IMAGE, // Just image
-    AUDIO_RECORDING, // Just audio
-    AUDIO_CLIP, // Just audio clip
+    AUDIO, // Just audio
 }

@@ -2,20 +2,16 @@ apply plugin: 'com.android.library'
 
 def groupId = "com.ichi2.anki"
 def artifactId = "api"
-def version = "1.1.0alpha6"
+def version = "1.1.0alpha5"
 
-repositories {
-    google()
-    jcenter()
-}
 android {
-    compileSdkVersion 28
+    compileSdkVersion 23
+    buildToolsVersion '23.0.2'
 
     defaultConfig {
         minSdkVersion 8
-        //noinspection OldTargetApi
-        targetSdkVersion 28
-        versionCode 11016   // 4th digit: 1=alpha, 2=beta, 3=official
+        targetSdkVersion 22
+        versionCode 11015   // 4th digit: 1=alpha, 2=beta, 3=official
         versionName version
     }
     buildTypes {
@@ -24,34 +20,10 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    testOptions {
-        unitTests {
-            includeAndroidResources = true
-        }
-    }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-    testOptions.unitTests.all {
-        testLogging {
-            events "failed", "skipped"
-            showStackTraces = true
-            exceptionFormat = "full"
-        }
-
-        maxParallelForks = gradleTestMaxParallelForks
-        systemProperties['junit.jupiter.execution.parallel.enabled'] = true
-        systemProperties['junit.jupiter.execution.parallel.mode.default'] = "concurrent"
-    }
 }
 
-apply from: "../lint.gradle"
-
 dependencies {
-    api fileTree(dir: 'libs', include: ['*.jar'])
-    testImplementation 'org.junit.vintage:junit-vintage-engine:5.6.2'
-    testImplementation 'org.robolectric:robolectric:4.3.1'
+    compile fileTree(dir: 'libs', include: ['*.jar'])
 }
 
 // Borrowed from here:
@@ -64,17 +36,6 @@ def localReleaseDest = "${buildDir}/release/${version}"
 task androidJavadocs(type: Javadoc) {
     source = android.sourceSets.main.java.srcDirs
     classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
-
-    // Java 10 wants you to choose between html4 and html5. We are html5 clean and should use it.
-    // But in JDK < 10 the option isn't there and it breaks the build. This handles both.
-    if(JavaVersion.current() >= JavaVersion.VERSION_1_10){
-        options.addBooleanOption('html5', true)
-    }
-}
-
-// Deprecation is an error. Use @SuppressWarnings("deprecation") and justify in the PR if you must
-tasks.withType(JavaCompile) {
-    options.compilerArgs << "-Xlint:deprecation" << "-Xmaxwarns" << "1000" << "-Werror"
 }
 
 task androidJavadocsJar(type: Jar, dependsOn: androidJavadocs) {
@@ -103,11 +64,9 @@ task zipRelease(type: Zip) {
     archiveName "release-${version}.zip"
 }
 
-task generateRelease {
-    doLast {
-        println "Release ${version} can be found at ${localReleaseDest}/"
-        println "Release ${version} zipped can be found ${buildDir}/release-${version}.zip"
-    }
+task generateRelease << {
+    println "Release ${version} can be found at ${localReleaseDest}/"
+    println "Release ${version} zipped can be found ${buildDir}/release-${version}.zip"
 }
 
 generateRelease.dependsOn(uploadArchives)
@@ -116,15 +75,4 @@ generateRelease.dependsOn(zipRelease)
 artifacts {
     archives androidSourcesJar
     archives androidJavadocsJar
-}
-
-// Deprecation is an error. Use @SuppressWarnings("deprecation") and justify in the PR if you must
-tasks.withType(JavaCompile) {
-    options.compilerArgs << "-Xlint:deprecation" << "-Xmaxwarns" << "1000" << "-Werror"
-
-    // https://guides.gradle.org/performance/#compiling_java
-    // 1- fork improves things over time with repeated builds, doesn't harm CI single builds
-    options.fork = true
-    // 2- incremental will be the default in the future and can help now
-    options.incremental = true
 }

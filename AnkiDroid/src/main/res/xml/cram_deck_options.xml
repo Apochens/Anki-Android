@@ -44,7 +44,8 @@
             android:defaultValue="true"
             android:disableDependentsState="false"
             android:key="stepsOn"
-            android:title="@string/deck_conf_cram_steps_summ" />
+            android:summary="@string/deck_conf_cram_steps_summ"
+            android:title="@string/deck_conf_cram_steps" />
 
         <com.ichi2.preferences.StepsPreference
             android:dependency="stepsOn"
