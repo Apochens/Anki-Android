@@ -20,15 +20,13 @@ import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.util.Pair;
 
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-
 import com.ichi2.anki.AnkiDroidApp;
 import com.ichi2.anki.CollectionHelper;
 import com.ichi2.anki.MetaDB;
 import com.ichi2.anki.services.NotificationService;
 import com.ichi2.async.BaseAsyncTask;
 import com.ichi2.libanki.Collection;
-import com.ichi2.libanki.sched.AbstractSched;
+import com.ichi2.libanki.Sched;
 
 import java.util.List;
 
@@ -51,16 +49,13 @@ public final class WidgetStatus {
 
     /**
      * Request the widget to update its status.
-     * TODO Mike - we can reduce battery usage by widget users by removing updatePeriodMillis from metadata
-     *             and replacing it with an alarm we set so device doesn't wake to update the widget, see:
-     *             https://developer.android.com/guide/topics/appwidgets/#MetaData
      */
     public static void update(Context context) {
         SharedPreferences preferences = AnkiDroidApp.getSharedPrefs(context);
         sSmallWidgetEnabled = preferences.getBoolean("widgetSmallEnabled", false);
         sNotificationEnabled = Integer.parseInt(preferences.getString("minimumCardsDueForNotification", "1000001")) < 1000000;
-        boolean canExecuteTask = ((sUpdateDeckStatusAsyncTask == null) || (sUpdateDeckStatusAsyncTask.getStatus() == AsyncTask.Status.FINISHED));
-        if ((sSmallWidgetEnabled || sNotificationEnabled) && canExecuteTask) {
+        if ((sSmallWidgetEnabled || sNotificationEnabled)
+                && ((sUpdateDeckStatusAsyncTask == null) || (sUpdateDeckStatusAsyncTask.getStatus() == AsyncTask.Status.FINISHED))) {
             Timber.d("WidgetStatus.update(): updating");
             sUpdateDeckStatusAsyncTask = new UpdateDeckStatusAsyncTask();
             sUpdateDeckStatusAsyncTask.execute(context);
@@ -109,11 +104,15 @@ public final class WidgetStatus {
             Timber.d("WidgetStatus.UpdateDeckStatusAsyncTask.onPostExecute()");
             MetaDB.storeSmallWidgetStatus(context, sSmallWidgetStatus);
             if (sSmallWidgetEnabled) {
-                new AnkiDroidWidgetSmall.UpdateService().doUpdate(context);
+                Intent intent;
+                intent = new Intent(context, AnkiDroidWidgetSmall.UpdateService.class);
+                context.startService(intent);
             }
-            Intent intent = new Intent(NotificationService.INTENT_ACTION);
-            Context appContext = context.getApplicationContext();
-            LocalBroadcastManager.getInstance(appContext).sendBroadcast(intent);
+            if (sNotificationEnabled) {
+                Intent intent;
+                intent = new Intent(context, NotificationService.class);
+                context.startService(intent);
+            }
         }
 
 
@@ -124,11 +123,11 @@ public final class WidgetStatus {
             col.getSched()._checkDay();
 
             // Only count the top-level decks in the total
-            List<AbstractSched.DeckDueTreeNode> nodes = col.getSched().deckDueTree();
-            for (AbstractSched.DeckDueTreeNode node : nodes) {
-                total[0] += node.getNewCount();
-                total[1] += node.getLrnCount();
-                total[2] += node.getRevCount();
+            List<Sched.DeckDueTreeNode> nodes = col.getSched().deckDueTree();
+            for (Sched.DeckDueTreeNode node : nodes) {
+                total[0] += node.newCount;
+                total[1] += node.lrnCount;
+                total[2] += node.revCount;
             }
             int due = total[0] + total[1] + total[2];
             int eta = col.getSched().eta(total, false);

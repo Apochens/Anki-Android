@@ -2,28 +2,18 @@
 package com.ichi2.anki;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
-import android.os.Parcelable;
-import android.preference.PreferenceManager;
 import android.util.AttributeSet;
+import android.widget.EditText;
 import android.widget.TextView;
-
-import androidx.annotation.NonNull;
-import androidx.appcompat.widget.AppCompatEditText;
-import timber.log.Timber;
 
 import com.ichi2.themes.Themes;
 
-import java.util.Objects;
 
-import static android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI;
+public class FieldEditText extends EditText {
 
-
-public class FieldEditText extends AppCompatEditText {
-
-    @NonNull
-    public static final String NEW_LINE = Objects.requireNonNull(System.getProperty("line.separator"));
+    public static final String NEW_LINE = System.getProperty("line.separator");
+    public static final String NL_MARK = "newLineMark";
 
     private String mName;
     private int mOrd;
@@ -45,30 +35,9 @@ public class FieldEditText extends AppCompatEditText {
     }
 
 
-    @Override
-    public Parcelable onSaveInstanceState() {
-        // content text has been saved in NoteEditor.java, restore twice caused issue#5660
-        super.onSaveInstanceState();
-        return null;
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        if (shouldDisableExtendedTextUi()) {
-            Timber.i("Disabling Extended Text UI");
-            this.setImeOptions(this.getImeOptions() | IME_FLAG_NO_EXTRACT_UI);
-        }
-    }
-
-    private boolean shouldDisableExtendedTextUi() {
-        try {
-            SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this.getContext());
-            return sp.getBoolean("disableExtendedTextUi", false);
-        } catch (Exception e) {
-            Timber.e(e, "Failed to get extended UI preference");
-            return false;
-        }
+    public FieldEditText(Context context, int ord, String name, String content) {
+        super(context);
+        init(ord, name, content);
     }
 
 

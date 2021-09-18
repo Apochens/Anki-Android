@@ -22,7 +22,8 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.text.TextUtils;
 
-import com.ichi2.utils.JSONObject;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -47,7 +48,6 @@ This class differs from the python version by keeping the in-memory tag cache as
 instead of a JSONObject. It is much more convenient to work with a TreeMap in Java, but there
 may be a performance penalty in doing so (on startup and shutdown).
  */
-@SuppressWarnings({"PMD.AvoidThrowingRawExceptionTypes"})
 public class Tags {
 
     private static final Pattern sCanonify = Pattern.compile("[\"']");
@@ -68,11 +68,15 @@ public class Tags {
 
 
     public void load(String json) {
-        JSONObject tags = new JSONObject(json);
-        Iterator<?> i = tags.keys();
-        while (i.hasNext()) {
-            String t = (String) i.next();
-            mTags.put(t, tags.getInt(t));
+        try {
+            JSONObject tags = new JSONObject(json);
+            Iterator<?> i = tags.keys();
+            while (i.hasNext()) {
+                String t = (String) i.next();
+                mTags.put(t, tags.getInt(t));
+            }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
         mChanged = false;
     }
@@ -82,7 +86,11 @@ public class Tags {
         if (mChanged) {
             JSONObject tags = new JSONObject();
             for (Map.Entry<String, Integer> t : mTags.entrySet()) {
-                tags.put(t.getKey(), t.getValue());
+                try {
+                    tags.put(t.getKey(), t.getValue());
+                } catch (JSONException e) {
+                    throw new RuntimeException(e);
+                }
             }
             ContentValues val = new ContentValues();
             val.put("tags", Utils.jsonToString(tags));
@@ -142,9 +150,15 @@ public class Tags {
             mChanged = true;
         }
         List<String> tags = new ArrayList<>();
-        try (Cursor cursor = mCol.getDb().getDatabase().query("SELECT DISTINCT tags FROM notes" + lim, null)) {
+        Cursor cursor = null;
+        try {
+            cursor = mCol.getDb().getDatabase().rawQuery("SELECT DISTINCT tags FROM notes"+lim, null);
             while (cursor.moveToNext()) {
                 tags.add(cursor.getString(0));
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.close();
             }
         }
         HashSet<String> tagSet = new HashSet<>();
@@ -172,17 +186,18 @@ public class Tags {
     * @return a list of the tags
     */
     public ArrayList<String> byDeck(long did, boolean children) {
-        List<String> tags;
+        String sql;
         if (children) {
             ArrayList<Long> dids = new ArrayList<>();
             dids.add(did);
             for (long id : mCol.getDecks().children(did).values()) {
                 dids.add(id);
             }
-            tags = mCol.getDb().queryColumn(String.class, "SELECT DISTINCT n.tags FROM cards c, notes n WHERE c.nid = n.id AND c.did IN " + Utils.ids2str(Utils.arrayList2array(dids)), 0);
+            sql = "SELECT DISTINCT n.tags FROM cards c, notes n WHERE c.nid = n.id AND c.did IN " + Utils.ids2str(Utils.arrayList2array(dids));
         } else {
-            tags = mCol.getDb().queryColumn(String.class, "SELECT DISTINCT n.tags FROM cards c, notes n WHERE c.nid = n.id AND c.did = ?", 0, new Object[] {did});
+            sql = "SELECT DISTINCT n.tags FROM cards c, notes n WHERE c.nid = n.id AND c.did = " + did;
         }
+        List<String> tags = mCol.getDb().queryColumn(String.class, sql, 0);
         // Cast to set to remove duplicates
         // Use methods used to get all tags to parse tags here as well.
         return new ArrayList<>(new HashSet<>(split(TextUtils.join(" ", tags))));
@@ -200,6 +215,7 @@ public class Tags {
      *
      * @param ids The cards to tag.
      * @param tags List of tags to add/remove. They are space-separated.
+     * @param add True/False to add/remove.
      */
     public void bulkAdd(List<Long> ids, String tags) {
         bulkAdd(ids, tags, true);
@@ -209,10 +225,6 @@ public class Tags {
     /**
      * FIXME: This method must be fixed before it is used. Its behaviour is currently incorrect.
      * This method is currently unused in AnkiDroid so it will not cause any errors in its current state.
-     *
-     * @param ids The cards to tag.
-     * @param tags List of tags to add/remove. They are space-separated.
-     * @param add True/False to add/remove.
      */
     public void bulkAdd(List<Long> ids, String tags, boolean add) {
         List<String> newTags = split(tags);
@@ -220,9 +232,7 @@ public class Tags {
             return;
         }
         // cache tag names
-        if (add) {
-            register(newTags);
-        }
+        register(newTags);
         // find notes missing the tags
         String l;
         if (add) {
@@ -235,27 +245,32 @@ public class Tags {
             if (lim.length() != 0) {
                 lim.append(" or ");
             }
-            t = t.replace("*", "%");
             lim.append(l).append("like '% ").append(t).append(" %'");
         }
+        Cursor cur = null;
         List<Long> nids = new ArrayList<>();
         ArrayList<Object[]> res = new ArrayList<>();
-        try (Cursor cur = mCol
-                .getDb()
-                .getDatabase()
-                .query("select id, tags from notes where id in " + Utils.ids2str(ids) +
-                        " and (" + lim + ")", null)) {
+        try {
+            cur = mCol
+                    .getDb()
+                    .getDatabase()
+                    .rawQuery("select id, tags from notes where id in " + Utils.ids2str(ids) +
+                            " and (" + lim + ")", null);
             if (add) {
                 while (cur.moveToNext()) {
                     nids.add(cur.getLong(0));
-                    res.add(new Object[] { addToStr(tags, cur.getString(1)), Utils.intTime(), mCol.usn(), cur.getLong(0) });
+                    res.add(new Object[] { addToStr(tags, cur.getString(1)), Utils.intNow(), mCol.usn(), cur.getLong(0) });
                 }
             } else {
                 while (cur.moveToNext()) {
                     nids.add(cur.getLong(0));
-                    res.add(new Object[] { remFromStr(tags, cur.getString(1)), Utils.intTime(), mCol.usn(),
+                    res.add(new Object[] { remFromStr(tags, cur.getString(1)), Utils.intNow(), mCol.usn(),
                             cur.getLong(0) });
                 }
+            }
+        } finally {
+            if (cur != null) {
+                cur.close();
             }
         }
         // update tags
@@ -274,7 +289,7 @@ public class Tags {
      */
 
     /** Parse a string and return a list of tags. */
-    public ArrayList<String> split(String tags) {
+    public List<String> split(String tags) {
         ArrayList<String> list = new ArrayList<>();
         for (String s : tags.replace('\u3000', ' ').split("\\s")) {
             if (s.length() > 0) {
@@ -307,19 +322,14 @@ public class Tags {
         return join(canonify(currentTags));
     }
 
-    // submethod of remFromStr in anki
-    public boolean wildcard(String pat, String str) {
-        String pat_replaced = Pattern.quote(pat).replace("\\*", ".*");
-        return Pattern.compile(pat_replaced, Pattern.CASE_INSENSITIVE|Pattern.UNICODE_CASE).matcher(str).matches();
-    }
 
-    /** Delete tags if they exist. */
+    /** Delete tags if they don't exist. */
     public String remFromStr(String deltags, String tags) {
         List<String> currentTags = split(tags);
         for (String tag : split(deltags)) {
             List<String> remove = new ArrayList<>();
             for (String tx: currentTags) {
-                if (tag.equalsIgnoreCase(tx) || wildcard(tag, tx)) {
+                if (tag.equalsIgnoreCase(tx)) {
                     remove.add(tx);
                 }
             }
@@ -372,16 +382,10 @@ public class Tags {
      */
 
     public void beforeUpload() {
-        boolean changed = false;
         for (String k : mTags.keySet()) {
-            if (mTags.get(k) != 0) {
-                mTags.put(k, 0);
-                changed = true;
-            }
+            mTags.put(k, 0);
         }
-        if (changed) {
-            save();
-        }
+        save();
     }
 
     /*

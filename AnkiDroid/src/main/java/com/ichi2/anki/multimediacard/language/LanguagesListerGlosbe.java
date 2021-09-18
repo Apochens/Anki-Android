@@ -23,6 +23,8 @@ package com.ichi2.anki.multimediacard.language;
 import java.util.HashMap;
 import java.util.Locale;
 
+import android.content.Context;
+
 /**
  * This language lister is used to call glosbe.com translation services.
  * <p>
@@ -31,10 +33,7 @@ import java.util.Locale;
  * It can be extended freely here, to support more languages.
  */
 public class LanguagesListerGlosbe extends LanguageListerBase {
-
-    private static HashMap<String, Locale> locale_map = null;
-
-    public LanguagesListerGlosbe() {
+    public LanguagesListerGlosbe(Context context) {
         final String [] languages ={"eng", "deu", "jpn", "fra", "spa", "pol", "ita", "rus",
             "ces", "zho", "nld", "por", "swe", "hrv", "hin", "hun", "vie", "ara", "tur"};
         // Java Locale uses ISO 639-2 rather than 639-3 so we currently only support the subset of
@@ -45,6 +44,8 @@ public class LanguagesListerGlosbe extends LanguageListerBase {
             addLanguage(locale.getDisplayLanguage(), locale.getISO3Language());
         }
     }
+
+    private static HashMap<String, Locale> locale_map = null;
 
     /**
      * Convert from 3 letter ISO 639-2 language code to ISO 639-1

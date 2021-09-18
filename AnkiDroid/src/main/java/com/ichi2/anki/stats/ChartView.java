@@ -26,6 +26,7 @@ import android.view.View;
 import com.ichi2.anki.Statistics;
 import com.wildplot.android.rendering.PlotSheet;
 import com.wildplot.android.rendering.graphics.wrapper.GraphicsWrap;
+import com.wildplot.android.rendering.graphics.wrapper.RectangleWrap;
 
 import timber.log.Timber;
 
@@ -64,6 +65,7 @@ public class ChartView extends View {
 
             Rect field = new Rect();
             this.getDrawingRect(field);
+            g.setClip(new RectangleWrap(field));
             if (mPlotSheet != null) {
                 mPlotSheet.paint(g);
             } else {

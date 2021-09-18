@@ -19,7 +19,7 @@ import android.graphics.Paint;
 
 import com.ichi2.anki.R;
 import com.ichi2.libanki.Collection;
-import com.ichi2.libanki.stats.Stats;
+import com.ichi2.libanki.Stats;
 import com.ichi2.themes.Themes;
 import com.wildplot.android.rendering.BarGraph;
 import com.wildplot.android.rendering.LegendDrawable;
@@ -42,7 +42,7 @@ public class ChartBuilder {
     private static final double Y_AXIS_STRETCH_FACTOR = 1.05;
 
     private final Stats.ChartType mChartType;
-    private long mDeckId;
+    private boolean mIsWholeCollection = false;
     private ChartView mChartView;
     private Collection mCollectionData;
 
@@ -59,15 +59,15 @@ public class ChartBuilder {
     private double mMcount;
     private boolean mDynamicAxis;
 
-    public ChartBuilder(ChartView chartView, Collection collectionData, long deckId, Stats.ChartType chartType){
+    public ChartBuilder(ChartView chartView, Collection collectionData, boolean isWholeCollection, Stats.ChartType chartType){
         mChartView = chartView;
         mCollectionData = collectionData;
-        mDeckId = deckId;
+        mIsWholeCollection = isWholeCollection;
         mChartType = chartType;
     }
 
     private void calcStats(Stats.AxisType type){
-        Stats stats = new Stats(mCollectionData, mDeckId);
+        Stats stats = new Stats(mCollectionData, mIsWholeCollection);
         switch (mChartType){
             case FORECAST:
                 stats.calculateDue(mChartView.getContext(), type);
@@ -170,12 +170,13 @@ public class ChartBuilder {
 
 
     private PlotSheet createPieChart(PlotSheet plotSheet) {
+        PieChart pieChart = new PieChart(plotSheet, mSeriesList[0]);
+
         ColorWrap[] colors = {new ColorWrap(Themes.getColorFromAttr(mChartView.getContext(), mColors[0])),
                               new ColorWrap(Themes.getColorFromAttr(mChartView.getContext(), mColors[1])),
                               new ColorWrap(Themes.getColorFromAttr(mChartView.getContext(), mColors[2])),
                               new ColorWrap(Themes.getColorFromAttr(mChartView.getContext(), mColors[3]))};
-
-        PieChart pieChart = new PieChart(plotSheet, mSeriesList[0], colors);
+        pieChart.setColors(colors);
         pieChart.setName(mChartView.getResources().getString(mValueLabels[0]) + ": " + (int) mSeriesList[0][0]);
         LegendDrawable legendDrawable1 = new LegendDrawable();
         LegendDrawable legendDrawable2 = new LegendDrawable();
@@ -265,7 +266,7 @@ public class ChartBuilder {
 
             Lines lines = new Lines(hiddenPlotSheet, cumulative, usedColor);
             lines.setSize(3f);
-            lines.setShadow(2f, 2f, ColorWrap.BLACK);
+            lines.setShadow(5f, 2f, 2f, ColorWrap.BLACK);
             if (!mHasColoredCumulative) {
                 lines.setName(name);
             }
@@ -289,13 +290,8 @@ public class ChartBuilder {
         //some explicit x-axis naming:
         switch (mChartType) {
             case ANSWER_BUTTONS:
-                if (mCollectionData.schedVer() == 1) {
-                    timePositions = new double[]{1, 2, 3, 6, 7, 8, 9, 11, 12, 13, 14};
-                    xAxis.setExplicitTicks(timePositions, mChartView.getResources().getStringArray(R.array.stats_eases_ticks));
-                } else {
-                    timePositions = new double[]{1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14};
-                    xAxis.setExplicitTicks(timePositions, mChartView.getResources().getStringArray(R.array.stats_eases_ticks_schedv2));
-                }
+                timePositions = new double[]{1, 2, 3, 6, 7, 8, 9, 11, 12, 13, 14};
+                xAxis.setExplicitTicks(timePositions, mChartView.getResources().getStringArray(R.array.stats_eases_ticks));
                 break;
             case HOURLY_BREAKDOWN:
                 timePositions = new double[]{0, 6, 12, 18, 23};
@@ -351,11 +347,7 @@ public class ChartBuilder {
         //some explicit x-axis naming:
         switch (mChartType) {
             case ANSWER_BUTTONS:
-                if (mCollectionData.schedVer() == 1) {
-                    timePositions = new double[]{1, 2, 3, 6, 7, 8, 9, 11, 12, 13, 14};
-                } else {
-                    timePositions = new double[]{1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14};
-                }
+                timePositions = new double[]{1, 2, 3, 6, 7, 8, 9, 11, 12, 13, 14};
                 yGrid.setExplicitTicks(timePositions);
                 break;
             case HOURLY_BREAKDOWN:

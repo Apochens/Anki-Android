@@ -17,7 +17,10 @@
 package com.ichi2.compat;
 
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
+import android.preference.PreferenceManager;
 import android.view.KeyCharacterMap;
 
 public class CompatHelper {
@@ -27,24 +30,24 @@ public class CompatHelper {
 
     private CompatHelper() {
 
-        if (getSdkVersion() >= 28) {
-            mCompat = new CompatV28();
-        } else if (getSdkVersion() >= 26) {
-            mCompat = new CompatV26();
-        } else if (getSdkVersion() >= 24) {
-            mCompat = new CompatV24();
-        } else if (getSdkVersion() >= 23) {
-            mCompat = new CompatV23();
+        if (isNookHdOrHdPlus() && getSdkVersion() == 15) {
+            mCompat = new CompatV15NookHdOrHdPlus();
         } else if (getSdkVersion() >= 21) {
             mCompat = new CompatV21();
         } else if (getSdkVersion() >= 19) {
             mCompat = new CompatV19();
-        } else if (getSdkVersion() >= 18) {
-            mCompat = new CompatV18();
         } else if (getSdkVersion() >= 17) {
             mCompat = new CompatV17();
-        } else {
+        } else if (getSdkVersion() >= 16) {
             mCompat = new CompatV16();
+        } else if (getSdkVersion() >= 15) {
+            mCompat = new CompatV15();
+        } else if (getSdkVersion() >= 11) {
+            mCompat = new CompatV11();
+        } else if (getSdkVersion() >= 12) {
+            mCompat = new CompatV12();
+        } else {
+            mCompat = new CompatV10();
         }
     }
 
@@ -53,6 +56,11 @@ public class CompatHelper {
         return Build.VERSION.SDK_INT;
     }
 
+
+    /** Determine if the device is running API level 11 or higher. */
+    public static boolean isHoneycomb() {
+        return getSdkVersion() >= Build.VERSION_CODES.HONEYCOMB;
+    }
     /** Determine if the device is running API level 21 or higher. */
     public static boolean isLollipop() {
         return getSdkVersion() >= Build.VERSION_CODES.LOLLIPOP;
@@ -76,13 +84,31 @@ public class CompatHelper {
         return sInstance;
     }
 
+    private boolean isNookHdOrHdPlus() {
+        return isNookHd() || isNookHdPlus();
+    }
+
+    private boolean isNookHdPlus() {
+        return android.os.Build.BRAND.equals("NOOK") && android.os.Build.PRODUCT.equals("HDplus")
+                && android.os.Build.DEVICE.equals("ovation");
+    }
+
+    private boolean isNookHd () {
+        return android.os.Build.MODEL.equalsIgnoreCase("bntv400") && android.os.Build.BRAND.equals("NOOK");
+    }
+
+
+    public static boolean isNook() {
+        return android.os.Build.MODEL.equalsIgnoreCase("nook") || android.os.Build.DEVICE.equalsIgnoreCase("nook");
+    }
+
+
     public static boolean isChromebook() {
-        return "chromium".equalsIgnoreCase(Build.BRAND) || "chromium".equalsIgnoreCase(Build.MANUFACTURER)
-                || "novato_cheets".equalsIgnoreCase(Build.DEVICE);
+        return android.os.Build.BRAND.equalsIgnoreCase("chromium") || android.os.Build.MANUFACTURER.equalsIgnoreCase("chromium");
     }
 
     public static boolean isKindle() {
-        return "amazon".equalsIgnoreCase(Build.BRAND) || "amazon".equalsIgnoreCase(Build.MANUFACTURER);
+        return Build.BRAND.equalsIgnoreCase("amazon") || Build.MANUFACTURER.equalsIgnoreCase("amazon");
     }
 
     public static boolean hasKanaAndEmojiKeys() {
@@ -91,5 +117,21 @@ public class CompatHelper {
 
     public static boolean hasScrollKeys() {
         return KeyCharacterMap.deviceHasKey(92) || KeyCharacterMap.deviceHasKey(93);
+    }
+
+    public static void removeHiddenPreferences(Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        if (isHoneycomb()){
+            preferences.edit().remove("longclickWorkaround").commit();
+        }
+        if (getSdkVersion() >= 13) {
+            preferences.edit().remove("safeDisplay").commit();
+        }
+        if (getSdkVersion() >= 15) {
+            preferences.edit().remove("inputWorkaround").commit();
+        }
+        if (getSdkVersion() >= 16) {
+            preferences.edit().remove("fixHebrewText").commit();
+        }
     }
 }

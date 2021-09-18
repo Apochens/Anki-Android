@@ -71,14 +71,7 @@ class Utils {
             byte[] digest = md.digest(data.getBytes("UTF-8"));
             BigInteger biginteger = new BigInteger(1, digest);
             String result = biginteger.toString(16);
-            
-            // pad checksum to 40 bytes, as is done in the main AnkiDroid code
-            if (result.length() < 40) {
-                String zeroes = "0000000000000000000000000000000000000000";
-                result = zeroes.substring(0, zeroes.length() - result.length()) + result;
-            }
-            
-            return Long.valueOf(result.substring(0, 8), 16);            
+            return Long.valueOf(result.substring(0, 8), 16);
         } catch (Exception e) {
             // This is guaranteed to never happen
             throw new IllegalStateException("Error making field checksum with SHA1 algorithm and UTF-8 encoding", e);
@@ -111,7 +104,6 @@ class Utils {
      * @param html The HTML escaped text
      * @return The text with its HTML entities unescaped.
      */
-    @SuppressWarnings("deprecation")
     private static String entsToTxt(String html) {
         // entitydefs defines nbsp as \xa0 instead of a standard space, so we
         // replace it first
@@ -119,7 +111,6 @@ class Utils {
         Matcher htmlEntities = htmlEntitiesPattern.matcher(html);
         StringBuffer sb = new StringBuffer();
         while (htmlEntities.find()) {
-            // Html.fromHtml(String) is deprecated but it's replacement isn't available till API24
             htmlEntities.appendReplacement(sb, Html.fromHtml(htmlEntities.group()).toString());
         }
         htmlEntities.appendTail(sb);

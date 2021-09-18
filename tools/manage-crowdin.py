@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python
 
 # Copyright (c) 2010 norbert.nagold@gmail.com
 #
@@ -18,7 +18,7 @@
 # This script updates the master file(s) for crowdin.net
 
 import pycurl
-import io
+import StringIO
 import sys
 import string
 import os
@@ -29,8 +29,8 @@ PROJECT_IDENTIFIER = 'ankidroid'
 
 path = './AnkiDroid/src/main/res/values/'
 
-files = ['01-core', '02-strings', '03-dialogs', '04-network', '05-feedback', '06-statistics', '07-cardbrowser', '08-widget', '09-backup', '10-preferences', '11-arrays', '14-marketdescription', '16-multimedia-editor', '17-model-manager', '18-standard-models']
-alllang = ['ar', 'bg', 'ca', 'cs', 'de', 'el', 'eo', 'es-AR', 'es-ES', 'et', 'fa', 'fi', 'fr', 'gl', 'got', 'he', 'hi', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'nl', 'nn-NO', 'no', 'pl', 'pt-PT', 'pt-BR', 'ro', 'ru', 'sk', 'sl', 'sr', 'sv-SE', 'th', 'tr', 'tt-RU', 'uk', 'vi', 'zh-CN', 'zh-TW']
+files = ['01-core', '02-strings', '03-dialogs', '04-network', '05-feedback', '06-statistics', '07-cardbrowser', '08-widget', '09-backup', '10-preferences', '11-arrays', '14-marketdescription', '16-multimedia-editor', '17-model-manager']
+alllang = ['ar', 'ca', 'cs', 'de', 'el', 'es-AR', 'es-ES', 'fa', 'fi', 'fr', 'hu', 'id', 'it', 'ja', 'ko', 'nl', 'pl', 'pt-PT', 'pt-BR', 'ro', 'ru', 'sr', 'sv-SE', 'th', 'tr', 'vi', 'zh-CN', 'zh-TW']
 
 
 '''def uploadtranslation(language, filename, sourcefile):
@@ -73,16 +73,16 @@ def updateMasterFile(fn):
         targetName = fn + '.xml'
         sourceName = path + targetName
     if targetName:  
-        print('Update of Master File ' + targetName)
+        print 'Update of Master File ' + targetName
         c = pycurl.Curl()
         fields = [('files['+targetName+']', (c.FORM_FILE, sourceName))]
         c.setopt(pycurl.URL, 'https://api.crowdin.com/api/project/' + PROJECT_IDENTIFIER + '/update-file?key=' + CROWDIN_KEY)
         c.setopt(pycurl.HTTPPOST, fields)
-        b = io.BytesIO()
+        b = StringIO.StringIO()
         c.setopt(pycurl.WRITEFUNCTION, b.write) 
         c.perform()
         c.close()
-        print(b.getvalue().decode('utf-8'))
+        print b.getvalue()
 
 
 try:
@@ -95,21 +95,21 @@ try:
     CROWDIN_KEY = c.readline();
     c.close()
 except IOError as e:
-    CROWDIN_KEY = input("please enter your crowdin key or create \'crowdin_key.txt\': ")
+    CROWDIN_KEY = raw_input("please enter your crowdin key or create \'crowdin_key.txt\': ")
 
 #sel = raw_input("update (m)aster file, update (t)ranslation or (r)efresh builds? ")
 sel='m'
 
 if sel == 'm':
     # Update Master Files:
-    fn = input("update " + ', '.join([str(x) for x in files]) + ", (all)?")
+    fn = raw_input("update " + ', '.join([str(x) for x in files]) + ", (all)?")
     if fn == 'all':
-        for f in files:
-            updateMasterFile(f)
+        for n in range(0, len(files)):
+            updateMasterFile(files[n])
     else:
         updateMasterFile(fn)
 else:
-    print("nothing to do")
+    print "nothing to do"
 
 '''
 elif sel == 't':

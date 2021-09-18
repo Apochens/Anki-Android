@@ -16,17 +16,15 @@
 package com.wildplot.android.rendering.graphics.wrapper;
 
 public class StrokeWrap {
-    private float strokeSize;
-
+    private float strokeSize = 0f;
 
     public StrokeWrap(float strokeSize) {
         super();
         this.strokeSize = strokeSize;
     }
 
-
     public float getStrokeSize() {
         return strokeSize;
     }
-
+    
 }

@@ -22,11 +22,8 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.text.TextUtils;
 
-import com.ichi2.utils.Assert;
-import com.ichi2.anki.AnkiDroidApp;
-import com.ichi2.anki.R;
-import com.ichi2.utils.LanguageUtil;
-import com.ichi2.utils.JSONObject;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -63,11 +60,14 @@ import java.util.Set;
  - rev queue: integer day
  - lrn queue: integer timestamp
  */
-@SuppressWarnings({"PMD.AvoidThrowingRawExceptionTypes","PMD.ExcessiveMethodLength","PMD.FieldDeclarationsShouldBeAtStartOfClass",
-                    "PMD.MethodNamingConventions"})
 public class Card implements Cloneable {
 
+    public static final int TYPE_NEW = 0;
+    public static final int TYPE_LRN = 1;
     public static final int TYPE_REV = 2;
+    public static final int QUEUE_SUSP = -1;
+    public static final int QUEUE_USER_BRD = -2;
+    public static final int QUEUE_SCHED_BRD = -3;
 
     private Collection mCol;
     private double mTimerStarted;
@@ -82,9 +82,7 @@ public class Card implements Cloneable {
     private int mOrd;
     private long mMod;
     private int mUsn;
-    @Consts.CARD_TYPE
     private int mType;
-    @Consts.CARD_QUEUE
     private int mQueue;
     private long mDue;
     private int mIvl;
@@ -125,8 +123,8 @@ public class Card implements Cloneable {
             // to flush, set nid, ord, and due
             mId = Utils.timestampID(mCol.getDb(), "cards");
             mDid = 1;
-            mType = Consts.CARD_TYPE_NEW;
-            mQueue = Consts.QUEUE_TYPE_NEW;
+            mType = 0;
+            mQueue = 0;
             mIvl = 0;
             mFactor = 0;
             mReps = 0;
@@ -141,9 +139,11 @@ public class Card implements Cloneable {
 
 
     public void load() {
-        try (Cursor cursor = mCol.getDb().getDatabase().query("SELECT * FROM cards WHERE id = " + mId, null)) {
+        Cursor cursor = null;
+        try {
+            cursor = mCol.getDb().getDatabase().rawQuery("SELECT * FROM cards WHERE id = " + mId, null);
             if (!cursor.moveToFirst()) {
-                throw new WrongId(mId, "card");
+                throw new RuntimeException(" No card with id " + mId);
             }
             mId = cursor.getLong(0);
             mNid = cursor.getLong(1);
@@ -163,6 +163,10 @@ public class Card implements Cloneable {
             mODid = cursor.getLong(15);
             mFlags = cursor.getInt(16);
             mData = cursor.getString(17);
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
         }
         mQA = null;
         mNote = null;
@@ -176,13 +180,13 @@ public class Card implements Cloneable {
 
     public void flush(boolean changeModUsn) {
         if (changeModUsn) {
-            mMod = Utils.intTime();
+            mMod = Utils.intNow();
             mUsn = mCol.usn();
         }
         // bug check
-        //if ((mQueue == Consts.QUEUE_TYPE_REV && mODue != 0) && !mCol.getDecks().isDyn(mDid)) {
+        if ((mQueue == 2 && mODue != 0) && !mCol.getDecks().isDyn(mDid)) {
             // TODO: runHook("odueInvalid");
-        //}
+        }
         assert (mDue < Long.valueOf("4294967296"));
         mCol.getDb().execute(
                 "insert or replace into cards values " +
@@ -212,12 +216,12 @@ public class Card implements Cloneable {
 
 
     public void flushSched() {
-        mMod = Utils.intTime();
+        mMod = Utils.intNow();
         mUsn = mCol.usn();
         // bug check
-        //if ((mQueue == Consts.QUEUE_TYPE_REV && mODue != 0) && !mCol.getDecks().isDyn(mDid)) {
+        if ((mQueue == 2 && mODue != 0) && !mCol.getDecks().isDyn(mDid)) {
             // TODO: runHook("odueInvalid");
-        //}
+        }
         assert (mDue < Long.valueOf("4294967296"));
 
         ContentValues values = new ContentValues();
@@ -261,7 +265,11 @@ public class Card implements Cloneable {
 
 
     public String css() {
-        return String.format(Locale.US, "<style>%s</style>", model().get("css"));
+        try {
+            return String.format(Locale.US, "<style>%s</style>", model().get("css"));
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 
@@ -280,13 +288,24 @@ public class Card implements Cloneable {
             Note f = note(reload);
             JSONObject m = model();
             JSONObject t = template();
-            long did = mODid != 0L ? mODid : mDid;
+            Object[] data;
+            try {
+                data = new Object[] { mId, f.getId(), m.getLong("id"), mODid != 0L ? mODid : mDid, mOrd,
+                        f.stringTags(), f.joinedFields() };
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            }
+
             if (browser) {
-                String bqfmt = t.getString("bqfmt");
-                String bafmt = t.getString("bafmt");
-                mQA = mCol._renderQA(mId, m, did, mOrd, f.stringTags(), f.getFields(), mFlags, browser, bqfmt, bafmt);
+                try {
+                    String bqfmt = t.getString("bqfmt");
+                    String bafmt = t.getString("bafmt");
+                    mQA = mCol._renderQA(data, bqfmt, bafmt);
+                } catch (JSONException e) {
+                    throw new RuntimeException(e);
+                }
             } else {
-                mQA = mCol._renderQA(mId, m, did, mOrd, f.stringTags(), f.getFields(), mFlags);
+                mQA = mCol._renderQA(data);
             }
         }
         return mQA;
@@ -306,18 +325,21 @@ public class Card implements Cloneable {
     }
 
 
-    // not in upstream
     public JSONObject model() {
-        return note().model();
+        return mCol.getModels().get(note().getMid());
     }
 
 
     public JSONObject template() {
         JSONObject m = model();
-        if (m.getInt("type") == Consts.MODEL_STD) {
-            return m.getJSONArray("tmpls").getJSONObject(mOrd);
-        } else {
-            return model().getJSONArray("tmpls").getJSONObject(0);
+        try {
+            if (m.getInt("type") == Consts.MODEL_STD) {
+                return m.getJSONArray("tmpls").getJSONObject(mOrd);
+            } else {
+                return model().getJSONArray("tmpls").getJSONObject(0);
+            }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -332,7 +354,20 @@ public class Card implements Cloneable {
      */
     public int timeLimit() {
         JSONObject conf = mCol.getDecks().confForDid(mODid == 0 ? mDid : mODid);
-        return conf.getInt("maxTaken") * 1000;
+        try {
+            return conf.getInt("maxTaken") * 1000;
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    public boolean shouldShowTimer() {
+        try {
+            return mCol.getDecks().confForDid(mODid == 0 ? mDid : mODid).getInt("timer") != 0;
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 
@@ -346,7 +381,7 @@ public class Card implements Cloneable {
 
 
     public boolean isEmpty() {
-        ArrayList<Integer> ords = mCol.getModels().availOrds(model(), note().getFields());
+        ArrayList<Integer> ords = mCol.getModels().availOrds(model(), Utils.joinFields(note().getFields()));
         return !ords.contains(mOrd);
     }
 
@@ -410,10 +445,6 @@ public class Card implements Cloneable {
         mMod = mod;
     }
 
-    public long getMod() {
-        return mMod ;
-    }
-
 
     public void setUsn(int usn) {
         mUsn = usn;
@@ -425,7 +456,6 @@ public class Card implements Cloneable {
     }
 
 
-    @Consts.CARD_TYPE
     public int getType() {
         return mType;
     }
@@ -445,13 +475,13 @@ public class Card implements Cloneable {
         return mLeft;
     }
 
-    @Consts.CARD_QUEUE
+
     public int getQueue() {
         return mQueue;
     }
 
 
-    public void setQueue(@Consts.CARD_QUEUE int queue) {
+    public void setQueue(int queue) {
         mQueue = queue;
     }
 
@@ -584,8 +614,7 @@ public class Card implements Cloneable {
 
 
     public boolean showTimer() {
-        JSONObject options = mCol.getDecks().confForDid(mODid == 0 ? mDid : mODid);
-        return DeckConfig.parseTimerOpt(options, true);
+        return mCol.getDecks().confForDid(mODid == 0 ? mDid : mODid).optInt("timer", 1) != 0;
     }
 
 
@@ -616,82 +645,5 @@ public class Card implements Cloneable {
             }
         }
         return TextUtils.join(",  ", members);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof Card) {
-            return this.getId() == ((Card)obj).getId();
-        }
-        return super.equals(obj);
-    }
-
-    @Override
-    public int hashCode() {
-        // Map a long to an int. For API>=24 you would just do `Long.hashCode(this.getId())`
-        return (int)(this.getId()^(this.getId()>>>32));
-    }
-
-    public static int intToFlag(int flags) {
-        // setting all bits to 0, except the three first one.
-        // equivalent to `mFlags % 8`. Used this way to copy Anki.
-        return flags & 0b111;
-    }
-
-    public int getUserFlag() {
-        return Card.intToFlag(mFlags);
-    }
-
-    public static int setFlagInInt(int mFlags, int flag) {
-        Assert.that(0 <= flag, "flag to set is negative");
-        Assert.that(flag <= 7, "flag to set is greater than 7.");
-        // Setting the 3 firsts bits to 0, keeping the remaining.
-        int extraData = (mFlags & ~0b111);
-        // flag in 3 fist bits, same data as in mFlags everywhere else
-        return extraData | flag;
-    }
-
-    public void setUserFlag(int flag) {
-        mFlags = setFlagInInt(mFlags, flag);
-    }
-
-    // not in Anki.
-    public String getDueString() {
-        String t = nextDue();
-        if (getQueue() < 0) {
-            t = "(" + t + ")";
-        }
-        return t;
-    }
-
-    // as in Anki aqt/browser.py
-    private String nextDue() {
-        long date;
-        long due = getDue();
-        if (getODid() != 0) {
-            return AnkiDroidApp.getAppResources().getString(R.string.card_browser_due_filtered_card);
-        } else if (getQueue() == Consts.QUEUE_TYPE_LRN) {
-            date = due;
-        } else if (getQueue() == Consts.QUEUE_TYPE_NEW || getType() == Consts.CARD_TYPE_NEW) {
-            return (new Long(due)).toString();
-        } else if (getQueue() == Consts.QUEUE_TYPE_REV || getQueue() == Consts.QUEUE_TYPE_DAY_LEARN_RELEARN || (getType() == Consts.CARD_TYPE_REV && getQueue() < 0)) {
-            long time = System.currentTimeMillis() / 1000L;
-            long nbDaySinceCreation = (due - getCol().getSched().getToday());
-            date = time + (nbDaySinceCreation * 86400L);
-        } else {
-            return "";
-        }
-        return LanguageUtil.getShortDateFormatFromS(date);
-    }
-
-    /** Non libAnki */
-    public boolean isDynamic() {
-        //I have cards in my collection with oDue <> 0 and oDid = 0.
-        //These are not marked as dynamic.
-        return this.getODid() != 0;
-    }
-
-    public boolean isReview() {
-        return this.getType() == Consts.CARD_TYPE_REV && this.getQueue() == Consts.QUEUE_TYPE_REV;
     }
 }

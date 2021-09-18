@@ -19,6 +19,7 @@ public class BasicStrokeWrap extends StrokeWrap {
 
     public BasicStrokeWrap(float strokeSize) {
         super(strokeSize);
+        // TODO Auto-generated constructor stub
     }
 
 }

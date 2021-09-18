@@ -38,4 +38,8 @@ public interface IMultimediaEditableNote extends Serializable {
 
 
     boolean isModified();
+
+
+    public void circularSwap();
+
 }

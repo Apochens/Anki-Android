@@ -1,8 +1,7 @@
 /***************************************************************************************
  * Copyright (c) 2012 Norbert Nagold <norbert.nagold@gmail.com>                         *
  * Copyright (c) 2012 Kostas Spyropoulos <inigo.aldana@gmail.com>                       *
- * Copyright (c) 2014 Timothy Rae <perceptualchaos2@gmail.com>                          *
- * Copyright (c) 2019 Mike Hardy <github@mikehardy.net>                                 *
+ * Copyright (c) 2014 Timothy Rae <perceptualchaos2@gmail.com>
  *                                                                                      *
  * This program is free software; you can redistribute it and/or modify it under        *
  * the terms of the GNU General Public License as published by the Free Software        *
@@ -20,19 +19,38 @@
 package com.ichi2.libanki.sync;
 
 
+
 import android.content.SharedPreferences;
 import android.net.Uri;
 
 import com.ichi2.anki.AnkiDroidApp;
 import com.ichi2.anki.exception.UnknownHttpResponseException;
-import com.ichi2.anki.web.CustomSyncServer;
 import com.ichi2.async.Connection;
 import com.ichi2.libanki.Consts;
 import com.ichi2.libanki.Utils;
 import com.ichi2.utils.VersionUtils;
 
+import org.apache.commons.httpclient.contrib.ssl.EasySSLSocketFactory;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpVersion;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.params.ConnManagerPNames;
+import org.apache.http.conn.params.ConnPerRouteBean;
+import org.apache.http.conn.scheme.PlainSocketFactory;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.entity.AbstractHttpEntity;
-import com.ichi2.utils.JSONObject;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.CoreProtocolPNames;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.params.HttpProtocolParams;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -52,16 +70,10 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
 import javax.net.ssl.SSLException;
 
-import androidx.annotation.Nullable;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 import timber.log.Timber;
 
 /**
@@ -71,12 +83,9 @@ import timber.log.Timber;
  * - 502: ankiweb down
  * - 503/504: server too busy
  */
-@SuppressWarnings( {"PMD.AvoidThrowingRawExceptionTypes", "PMD.NPathComplexity"})
 public class HttpSyncer {
 
     private static final String BOUNDARY = "Anki-sync-boundary";
-    private static final MediaType ANKI_POST_TYPE = MediaType.get("multipart/form-data; boundary=" + BOUNDARY);
-
     public static final String ANKIWEB_STATUS_OK = "OK";
 
     public volatile long bytesSent = 0;
@@ -92,87 +101,56 @@ public class HttpSyncer {
     protected String mSKey;
     protected Connection mCon;
     protected Map<String, Object> mPostVars;
-    private volatile OkHttpClient mHttpClient;
-    private final HostNum mHostNum;
 
-    public HttpSyncer(String hkey, Connection con, HostNum hostNum) {
+
+    public HttpSyncer(String hkey, Connection con) {
         mHKey = hkey;
         mSKey = Utils.checksum(Float.toString(new Random().nextFloat())).substring(0, 8);
         mCon = con;
         mPostVars = new HashMap<>();
-        mHostNum = hostNum;
-    }
-
-    private OkHttpClient.Builder getHttpClientBuilder() {
-        OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder()
-                .addNetworkInterceptor(chain -> chain.proceed(
-                        chain.request()
-                                .newBuilder()
-                                .header("User-Agent", "AnkiDroid-" + VersionUtils.getPkgVersionName())
-                                .build()
-                ));
-        Tls12SocketFactory.enableTls12OnPreLollipop(clientBuilder)
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .retryOnConnectionFailure(true)
-                .cache(null)
-                .connectTimeout(Connection.CONN_TIMEOUT, TimeUnit.SECONDS)
-                .writeTimeout(Connection.CONN_TIMEOUT, TimeUnit.SECONDS)
-                .readTimeout(Connection.CONN_TIMEOUT, TimeUnit.SECONDS);
-        return clientBuilder;
-    }
-
-    private OkHttpClient getHttpClient() {
-        if (this.mHttpClient != null) {
-            return mHttpClient;
-        }
-        return setupHttpClient();
-    }
-
-    //PERF: Thread safety isn't required for the current implementation
-    private synchronized OkHttpClient setupHttpClient() {
-        if (mHttpClient != null) {
-            return mHttpClient;
-        }
-        mHttpClient = getHttpClientBuilder().build();
-        return mHttpClient;
     }
 
 
-    public void assertOk(Response resp) throws UnknownHttpResponseException {
+    public void assertOk(HttpResponse resp) throws UnknownHttpResponseException {
         // Throw RuntimeException if HTTP error
         if (resp == null) {
             throw new UnknownHttpResponseException("Null HttpResponse", -2);
         }
-        int resultCode = resp.code();
+        int resultCode = resp.getStatusLine().getStatusCode();
         if (!(resultCode == 200 || resultCode == 403)) {
-            String reason = resp.message();
+            String reason = resp.getStatusLine().getReasonPhrase();
             throw new UnknownHttpResponseException(reason, resultCode);
         }
     }
 
-    /** Note: Return value must be closed */
-    public Response req(String method) throws UnknownHttpResponseException {
+
+    public HttpResponse req(String method) throws UnknownHttpResponseException {
         return req(method, null);
     }
 
-    /** Note: Return value must be closed */
-    public Response req(String method, InputStream fobj) throws UnknownHttpResponseException {
+
+    public HttpResponse req(String method, InputStream fobj) throws UnknownHttpResponseException {
         return req(method, fobj, 6);
     }
 
-    /** Note: Return value must be closed */
-    public Response req(String method, int comp, InputStream fobj) throws UnknownHttpResponseException {
+
+    public HttpResponse req(String method, int comp, InputStream fobj) throws UnknownHttpResponseException {
         return req(method, fobj, comp);
     }
 
-    /** Note: Return value must be closed */
-    public Response req(String method, InputStream fobj, int comp) throws UnknownHttpResponseException {
+
+    public HttpResponse req(String method, InputStream fobj, int comp) throws UnknownHttpResponseException {
         return req(method, fobj, comp, null);
     }
 
-    /** Note: Return value must be closed */
-    private Response req(String method, InputStream fobj, int comp, JSONObject registerData) throws UnknownHttpResponseException {
+
+    public HttpResponse req(String method, InputStream fobj, int comp, JSONObject registerData) throws UnknownHttpResponseException {
+        return req(method, fobj, comp, registerData, null) ;
+    }
+
+
+    public HttpResponse req(String method, InputStream fobj, int comp, JSONObject registerData,
+            Connection.CancelCallback cancelCallback) throws UnknownHttpResponseException {
         File tmpFileBuffer = null;
         try {
             String bdry = "--" + BOUNDARY;
@@ -215,40 +193,56 @@ public class HttpSyncer {
             } else {
                 buf.close();
                 bos.write(buf.toString().getBytes("UTF-8"));
-                bos.write((bdry + "--\r\n").getBytes("UTF-8"));
             }
             bos.flush();
             bos.close();
             // connection headers
+            String url = Consts.SYNC_BASE;
+            if (method.equals("register")) {
+                url = url + "account/signup" + "?username=" + registerData.getString("u") + "&password="
+                        + registerData.getString("p");
+            } else if (method.startsWith("upgrade")) {
+                url = url + method;
+            } else {
+                url = syncURL() + method;
+            }
+            HttpPost httpPost = new HttpPost(url);
+            HttpEntity entity = new ProgressByteEntity(tmpFileBuffer);
 
-            String url = Uri.parse(syncURL()).buildUpon().appendPath(method).toString();
+            // body
+            httpPost.setEntity(entity);
+            httpPost.setHeader("Content-type", "multipart/form-data; boundary=" + BOUNDARY);
 
-            Request.Builder requestBuilder = new Request.Builder();
-            requestBuilder.url(url);
+            // HttpParams
+            HttpParams params = new BasicHttpParams();
+            params.setParameter(ConnManagerPNames.MAX_TOTAL_CONNECTIONS, 30);
+            params.setParameter(ConnManagerPNames.MAX_CONNECTIONS_PER_ROUTE, new ConnPerRouteBean(30));
+            params.setParameter(CoreProtocolPNames.USE_EXPECT_CONTINUE, false);
+            params.setParameter(CoreProtocolPNames.USER_AGENT, "AnkiDroid-" + VersionUtils.getPkgVersionName());
+            HttpProtocolParams.setVersion(params, HttpVersion.HTTP_1_1);
+            HttpConnectionParams.setSoTimeout(params, Connection.CONN_TIMEOUT);
 
-            requestBuilder.post(new CountingFileRequestBody(tmpFileBuffer, ANKI_POST_TYPE.toString(), num -> {
-                bytesSent += num;
-                publishProgress();
-            }));
-            Request httpPost = requestBuilder.build();
+            // Registry
+            SchemeRegistry registry = new SchemeRegistry();
+            registry.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
+            registry.register(new Scheme("https", new EasySSLSocketFactory(), 443));
+            ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(params, registry);
+            if (cancelCallback != null) {
+                cancelCallback.setConnectionManager(cm);
+            }
 
             try {
-                OkHttpClient httpClient = getHttpClient();
-                Response httpResponse = httpClient.newCall(httpPost).execute();
-
+                HttpClient httpClient = new DefaultHttpClient(cm, params);
+                HttpResponse httpResponse = httpClient.execute(httpPost);
                 // we assume badAuthRaises flag from Anki Desktop always False
                 // so just throw new RuntimeException if response code not 200 or 403
-                Timber.d("TLSVersion in use is: %s",
-                        (httpResponse.handshake() != null ? httpResponse.handshake().tlsVersion() : "unknown"));
-
-
                 assertOk(httpResponse);
                 return httpResponse;
             } catch (SSLException e) {
                 Timber.e(e, "SSLException while building HttpClient");
-                throw new RuntimeException("SSLException while building HttpClient", e);
+                throw new RuntimeException("SSLException while building HttpClient");
             }
-        } catch (UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException | JSONException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             Timber.e(e, "BasicHttpSyncer.sync: IOException");
@@ -261,7 +255,6 @@ public class HttpSyncer {
     }
 
 
-    // Could be replaced by Compat copy method if that method took listener for bytesReceived/publishProgress()
     public void writeToFile(InputStream source, String destination) throws IOException {
         File file = new File(destination);
         OutputStream output = null;
@@ -290,6 +283,11 @@ public class HttpSyncer {
     }
 
 
+    public String stream2String(InputStream stream) {
+        return stream2String(stream, -1);
+    }
+
+
     public String stream2String(InputStream stream, int maxSize) {
         BufferedReader rd;
         try {
@@ -311,11 +309,9 @@ public class HttpSyncer {
 
 
     private void publishProgress() {
-        Timber.d("Publishing progress");
         if (mCon != null && (mNextSendR <= bytesReceived || mNextSendS <= bytesSent)) {
             long bR = bytesReceived;
             long bS = bytesSent;
-            Timber.d("Current progress: %d, %d", bytesReceived, bytesSent);
             mNextSendR = (bR / 1024 + 1) * 1024;
             mNextSendS = (bS / 1024 + 1) * 1024;
             mCon.publishProgress(0, bS, bR);
@@ -323,7 +319,7 @@ public class HttpSyncer {
     }
 
 
-    public Response hostKey(String arg1, String arg2) throws UnknownHttpResponseException {
+    public HttpResponse hostKey(String arg1, String arg2) throws UnknownHttpResponseException {
         return null;
     }
 
@@ -338,6 +334,11 @@ public class HttpSyncer {
     }
 
 
+    public JSONObject chunk(JSONObject kw) throws UnknownHttpResponseException {
+        return null;
+    }
+
+
     public JSONObject chunk() throws UnknownHttpResponseException {
         return null;
     }
@@ -348,12 +349,7 @@ public class HttpSyncer {
     }
 
 
-    public void abort() throws UnknownHttpResponseException {
-        // do nothing
-    }
-
-
-    public Response meta() throws UnknownHttpResponseException {
+    public HttpResponse meta() throws UnknownHttpResponseException {
         return null;
     }
 
@@ -374,9 +370,7 @@ public class HttpSyncer {
 
 
     public void applyChunk(JSONObject sech) throws UnknownHttpResponseException {
-        // do nothing
     }
-
 
     public class ProgressByteEntity extends AbstractHttpEntity {
 
@@ -413,7 +407,7 @@ public class HttpSyncer {
 
 
         @Override
-        public InputStream getContent() throws IllegalStateException {
+        public InputStream getContent() throws IOException, IllegalStateException {
             return mInputStream;
         }
 
@@ -447,39 +441,20 @@ public class HttpSyncer {
     }
 
 
+    public HttpResponse register(String user, String pw) throws UnknownHttpResponseException {
+        return null;
+    }
+
+
     public String syncURL() {
         // Allow user to specify custom sync server
         SharedPreferences userPreferences = AnkiDroidApp.getSharedPrefs(AnkiDroidApp.getInstance());
-        if (isUsingCustomSyncServer(userPreferences)) {
-            String syncBaseString = CustomSyncServer.getSyncBaseUrl(userPreferences);
-            if (syncBaseString == null) {
-                return getDefaultAnkiWebUrl();
-            }
-            return Uri.parse(syncBaseString).buildUpon().appendPath(getUrlPrefix()).toString() + "/";
+        if (userPreferences!= null && userPreferences.getBoolean("useCustomSyncServer", false)) {
+            Uri syncBase = Uri.parse(userPreferences.getString("syncBaseUrl", Consts.SYNC_BASE));
+            return syncBase.buildUpon().appendPath("sync").toString() + "/";
         }
         // Usual case
-        return getDefaultAnkiWebUrl();
-    }
-
-    protected String getUrlPrefix() {
-        return "sync";
-    }
-
-    protected Integer getHostNum() {
-        return mHostNum.getHostNum();
-    }
-
-    protected boolean isUsingCustomSyncServer(@Nullable SharedPreferences userPreferences) {
-        return userPreferences != null && CustomSyncServer.isEnabled(userPreferences);
-    }
-
-    protected String getDefaultAnkiWebUrl() {
-        String hostNumAsStringFormat = "";
-        Integer hostNum = getHostNum();
-        if (hostNum != null) {
-            hostNumAsStringFormat = hostNum.toString();
-        }
-        return String.format(Consts.SYNC_BASE, hostNumAsStringFormat) + getUrlPrefix() + "/";
+        return Consts.SYNC_BASE + "sync/";
     }
 }
 
