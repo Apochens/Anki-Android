@@ -17,7 +17,6 @@
 
 package com.ichi2.libanki.sync;
 
-import android.database.SQLException;
 import android.text.TextUtils;
 import android.util.Pair;
 
@@ -29,12 +28,14 @@ import com.ichi2.async.Connection;
 import com.ichi2.libanki.Collection;
 import com.ichi2.libanki.Consts;
 
-import com.ichi2.utils.JSONArray;
-import com.ichi2.utils.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -64,9 +65,6 @@ import timber.log.Timber;
  * through a file manager) will not be recorded and will not be synced. In this case, the user
  * must issue a media check command through the UI to bring the database up-to-date.
  */
-@SuppressWarnings({"PMD.AvoidThrowingRawExceptionTypes","PMD.AvoidReassigningParameters",
-        "PMD.NPathComplexity","PMD.MethodNamingConventions","PMD.ExcessiveMethodLength","PMD.OneDeclarationPerLine",
-        "PMD.SwitchStmtsShouldHaveDefault","PMD.EmptyIfStmt","PMD.SimplifyBooleanReturns","PMD.CollapsibleIfStatements"})
 public class MediaSyncer {
     private Collection mCol;
     private RemoteMediaServer mServer;
@@ -82,17 +80,14 @@ public class MediaSyncer {
 
 
     public String sync() throws UnknownHttpResponseException, MediaSyncException {
+        try {
             // check if there have been any changes
             // If we haven't built the media db yet, do so on this sync. See note at the top
             // of this class about this difference to the original.
             if (mCol.getMedia().needScan()) {
                 mCon.publishProgress(R.string.sync_media_find);
                 mCol.log("findChanges");
-                try {
-                    mCol.getMedia().findChanges();
-                } catch (SQLException ignored) {
-                    return "corruptMediaDB";
-                }
+                mCol.getMedia().findChanges();
             }
 
             // begin session and check if in sync
@@ -190,7 +185,7 @@ public class MediaSyncer {
                     }
 
                     mCon.publishProgress(String.format(
-                                                       AnkiDroidApp.getAppResources().getString(R.string.sync_media_changes_count), toSend));
+                            AnkiDroidApp.getAppResources().getString(R.string.sync_media_changes_count), toSend));
 
                     JSONArray changes = mServer.uploadChanges(zip);
                     int processedCnt = changes.getInt(0);
@@ -198,8 +193,8 @@ public class MediaSyncer {
                     mCol.getMedia().markClean(fnames.subList(0, processedCnt));
 
                     mCol.log(String.format(Locale.US,
-                                           "processed %d, serverUsn %d, clientUsn %d",
-                                           processedCnt, serverLastUsn, lastUsn));
+                            "processed %d, serverUsn %d, clientUsn %d",
+                            processedCnt, serverLastUsn, lastUsn));
 
                     if (serverLastUsn - processedCnt == lastUsn) {
                         mCol.log("lastUsn in sync, updating local");
@@ -224,11 +219,14 @@ public class MediaSyncer {
 
             int lcnt = mCol.getMedia().mediacount();
             String sRet = mServer.mediaSanity(lcnt);
-            if ("OK".equals(sRet)) {
+            if (sRet.equals("OK")) {
                 return "OK";
             } else {
                 mCol.getMedia().forceResync();
                 return sRet;
+            }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
     }
 

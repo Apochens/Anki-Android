@@ -41,11 +41,8 @@ public class BasicControllerFactory implements IControllerFactory {
             case IMAGE:
                 return new BasicImageFieldController();
 
-            case AUDIO_RECORDING:
-                return new BasicAudioRecordingFieldController();
-
-            case AUDIO_CLIP:
-                return new BasicAudioClipFieldController();
+            case AUDIO:
+                return new BasicAudioFieldController();
 
             default:
 

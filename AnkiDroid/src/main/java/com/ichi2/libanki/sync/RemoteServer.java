@@ -23,32 +23,31 @@ import com.ichi2.libanki.Consts;
 import com.ichi2.libanki.Utils;
 import com.ichi2.utils.VersionUtils;
 
-import com.ichi2.utils.JSONException;
-import com.ichi2.utils.JSONObject;
+import org.apache.http.HttpResponse;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Locale;
 
-import okhttp3.Response;
-
-@SuppressWarnings({"PMD.AvoidThrowingRawExceptionTypes","PMD.MethodNamingConventions"})
 public class RemoteServer extends HttpSyncer {
 
-    public RemoteServer(Connection con, String hkey, HostNum hostNum) {
-        super(hkey, con, hostNum);
+    public RemoteServer(Connection con, String hkey) {
+        super(hkey, con);
     }
 
 
-    /** Returns hkey or null if user/pw incorrect. */
+    /** Returns hkey or none if user/pw incorrect. 
+     * @throws UnknownHttpResponseException */
     @Override
-    public Response hostKey(String user, String pw) throws UnknownHttpResponseException {
+    public HttpResponse hostKey(String user, String pw) throws UnknownHttpResponseException {
         try {
             mPostVars = new HashMap<>();
             JSONObject jo = new JSONObject();
             jo.put("u", user);
             jo.put("p", pw);
-            return super.req("hostKey", HttpSyncer.getInputStream(Utils.jsonToString(jo)));
+            return super.req("hostKey", super.getInputStream(Utils.jsonToString(jo)));
         } catch (JSONException e) {
             return null;
         }
@@ -56,15 +55,19 @@ public class RemoteServer extends HttpSyncer {
 
 
     @Override
-    public Response meta() throws UnknownHttpResponseException {
-        mPostVars = new HashMap<>();
-        mPostVars.put("k", mHKey);
-        mPostVars.put("s", mSKey);
-        JSONObject jo = new JSONObject();
-        jo.put("v", Consts.SYNC_VER);
-        jo.put("cv",
-                String.format(Locale.US, "ankidroid,%s,%s", VersionUtils.getPkgVersionName(), Utils.platDesc()));
-        return super.req("meta", HttpSyncer.getInputStream(Utils.jsonToString(jo)));
+    public HttpResponse meta() throws UnknownHttpResponseException {
+        try {
+            mPostVars = new HashMap<>();
+            mPostVars.put("k", mHKey);
+            mPostVars.put("s", mSKey);
+            JSONObject jo = new JSONObject();
+            jo.put("v", Consts.SYNC_VER);
+            jo.put("cv",
+                    String.format(Locale.US, "ankidroid,%s,%s", VersionUtils.getPkgVersionName(), Utils.platDesc()));
+            return super.req("meta", super.getInputStream(Utils.jsonToString(jo)));
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 
@@ -110,9 +113,9 @@ public class RemoteServer extends HttpSyncer {
 
     /** Python has dynamic type deduction, but we don't, so return String **/
     private String _run(String cmd, JSONObject data) throws UnknownHttpResponseException {
-        Response ret = super.req(cmd, HttpSyncer.getInputStream(Utils.jsonToString(data)));
+        HttpResponse ret = super.req(cmd, super.getInputStream(Utils.jsonToString(data)));
         try {
-            return ret.body().string();
+            return super.stream2String(ret.getEntity().getContent());
         } catch (IllegalStateException | IOException e) {
             throw new RuntimeException(e);
         }
@@ -120,10 +123,14 @@ public class RemoteServer extends HttpSyncer {
 
     /** Note: these conversion helpers aren't needed in libanki as type deduction occurs automatically there **/
     private JSONObject parseDict(String s) {
-        if (!"null".equalsIgnoreCase(s) && s.length() != 0) {
-            return new JSONObject(s);
-        } else {
-            return new JSONObject();
+        try {
+            if (!s.equalsIgnoreCase("null") && s.length() != 0) {
+                return new JSONObject(s);
+            } else {
+                return new JSONObject();
+            }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
     }
 

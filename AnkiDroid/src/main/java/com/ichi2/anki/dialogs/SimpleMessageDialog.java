@@ -10,7 +10,7 @@ import com.ichi2.anki.R;
 public class SimpleMessageDialog extends AsyncDialogFragment {
 
     public interface SimpleMessageDialogListener {
-        void dismissSimpleMessageDialog(boolean reload);
+        public void dismissSimpleMessageDialog(boolean reload);
     }
 
 
@@ -32,22 +32,26 @@ public class SimpleMessageDialog extends AsyncDialogFragment {
 
     @Override
     public MaterialDialog onCreateDialog(Bundle savedInstanceState) {
-        // FIXME this should be super.onCreateDialog(Bundle), no?
         super.onCreate(savedInstanceState);
         return new MaterialDialog.Builder(getActivity())
                 .title(getNotificationTitle())
                 .content(getNotificationMessage())
                 .positiveText(res().getString(R.string.dialog_ok))
-                .onPositive((dialog, which) -> ((SimpleMessageDialogListener) getActivity())
-                        .dismissSimpleMessageDialog(getArguments().getBoolean(
-                                "reload")))
+                .callback(new MaterialDialog.ButtonCallback() {
+                    @Override
+                    public void onPositive(MaterialDialog dialog) {
+                        ((SimpleMessageDialogListener) getActivity())
+                                .dismissSimpleMessageDialog(getArguments().getBoolean(
+                                        "reload"));
+                    }
+                })
                 .show();
     }
 
 
     public String getNotificationTitle() {
         String title = getArguments().getString("title");
-        if (!"".equals(title)) {
+        if (!title.equals("")) {
             return title;
         } else {
             return AnkiDroidApp.getAppResources().getString(R.string.app_name);

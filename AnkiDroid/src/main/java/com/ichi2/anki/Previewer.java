@@ -39,37 +39,23 @@ public class Previewer extends AbstractFlashcardViewer {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Timber.d("onCreate()");
-        super.onCreate(savedInstanceState);
-
         mCardList = getIntent().getLongArrayExtra("cardList");
         mIndex = getIntent().getIntExtra("index", -1);
-
-        if (savedInstanceState != null){
-            mIndex = savedInstanceState.getInt("index", mIndex);
-            mShowingAnswer = savedInstanceState.getBoolean("showingAnswer", mShowingAnswer);
-        }
-
         if (mCardList.length == 0 || mIndex < 0 || mIndex > mCardList.length - 1) {
             Timber.e("Previewer started with empty card list or invalid index");
             finishWithoutAnimation();
-            return;
         }
+        super.onCreate(savedInstanceState);
         showBackIcon();
         // Ensure navigation drawer can't be opened. Various actions in the drawer cause crashes.
         disableDrawerSwipe();
-        startLoadingCollection();
     }
 
     @Override
     protected void onCollectionLoaded(Collection col) {
         super.onCollectionLoaded(col);
         mCurrentCard = col.getCard(mCardList[mIndex]);
-        if (mShowingAnswer){
-            displayCardQuestion();
-            displayCardAnswer();
-        } else {
-            displayCardQuestion();
-        }
+        displayCardQuestion();
         showBackIcon();
     }
 
@@ -84,15 +70,6 @@ public class Previewer extends AbstractFlashcardViewer {
     protected void initLayout() {
         super.initLayout();
         mTopBarLayout.setVisibility(View.GONE);
-    }
-
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        outState.putLongArray("cardList", mCardList);
-        outState.putInt("index", mIndex);
-        outState.putBoolean("showingAnswer", mShowingAnswer);
-        super.onSaveInstanceState(outState);
     }
 
 
@@ -115,41 +92,35 @@ public class Previewer extends AbstractFlashcardViewer {
 
     // we don't want the Activity title to be changed.
     @Override
-    protected void updateScreenCounts() { /* do nothing */ }
+    protected void updateScreenCounts() {
+    }
 
 
+    // No Gestures!
     @Override
-    public boolean executeCommand(int which) {
-        /* do nothing */
-        return false;
+    protected void executeCommand(int which) {
     }
 
     private View.OnClickListener mSelectScrollHandler = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            if (mShowingAnswer) {
-                // If we are showing the answer, any click will show a question...
-                if (view.getId() == R.id.flashcard_layout_ease2) {
-                    // ...but if they clicked "forward" we need to move to the next card first
-                    mIndex++;
-                    mCurrentCard = getCol().getCard(mCardList[mIndex]);
-                }
-                displayCardQuestion();
-            } else {
-                // If we are showing the question, any click will show an answer...
-                if (view.getId() == R.id.flashcard_layout_ease1) {
-                    // ...but if they clicked "reverse" we need to go to the previous card first
-                    mIndex--;
-                    mCurrentCard = getCol().getCard(mCardList[mIndex]);
-                }
+            if (!mShowingAnswer) {
                 displayCardAnswer();
+            } else {
+                if (view.getId() == R.id.flashcard_layout_ease1) {
+                    mIndex--;
+                } else if (view.getId() == R.id.flashcard_layout_ease2) {
+                    mIndex++;
+                }
+                mCurrentCard = getCol().getCard(mCardList[mIndex]);
+                displayCardQuestion();
             }
         }
     };
 
     private void updateButtonState() {
         // If we are in single-card mode, we show the "Show Answer" button on the question side
-        // and hide all the buttons on the answer side.
+        // and hide all the button s on the answer side.
         if (mCardList.length == 1) {
             if (!mShowingAnswer) {
                 mFlipCardLayout.setVisibility(View.VISIBLE);
@@ -182,7 +153,8 @@ public class Previewer extends AbstractFlashcardViewer {
         mEase2Layout.setOnClickListener(mSelectScrollHandler);
         mEase2Layout.setBackgroundResource(background[0]);
 
-        if (mIndex == 0 && !mShowingAnswer) {
+
+        if (mIndex == 0 && mShowingAnswer) {
             mEase1Layout.setEnabled(false);
             mNext1.setText("-");
         } else {

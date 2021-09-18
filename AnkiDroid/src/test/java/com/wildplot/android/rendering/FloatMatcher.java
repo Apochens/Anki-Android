@@ -1,8 +1,9 @@
 package com.wildplot.android.rendering;
 
-import org.mockito.ArgumentMatcher;
+import org.hamcrest.Description;
+import org.hamcrest.TypeSafeMatcher;
 
-class FloatMatcher implements ArgumentMatcher<Float> {
+class FloatMatcher extends TypeSafeMatcher<Float> {
     private final double expected;
     private final double precision;
 
@@ -16,7 +17,13 @@ class FloatMatcher implements ArgumentMatcher<Float> {
     }
 
     @Override
-    public boolean matches(Float actualValue) {
+    protected boolean matchesSafely(Float actualValue) {
         return Math.abs(((double) actualValue) - expected) <= precision;
+    }
+
+
+    @Override
+    public void describeTo(Description description) {
+        description.appendText(expected + " ± " + precision);
     }
 }

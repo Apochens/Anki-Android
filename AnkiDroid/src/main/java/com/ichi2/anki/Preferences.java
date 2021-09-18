@@ -20,70 +20,58 @@
 
 package com.ichi2.anki;
 
-import android.app.ActivityManager;
-import android.app.AlarmManager;
-import android.app.AlertDialog;
-import android.app.PendingIntent;
-import android.content.ActivityNotFoundException;
+import android.annotation.TargetApi;
 import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
+import android.content.res.Resources;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
 import android.preference.EditTextPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
-import android.preference.PreferenceActivity;
+import android.preference.Preference.OnPreferenceChangeListener;
+import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceCategory;
+import android.preference.PreferenceFragment;
 import android.preference.PreferenceGroup;
+import android.support.annotation.NonNull;
 import android.preference.PreferenceScreen;
-import android.provider.MediaStore;
 import android.text.TextUtils;
+import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.WindowManager.BadTokenException;
-import android.webkit.URLUtil;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
+import com.ichi2.libanki.hooks.AdvancedStatistics;
+import com.ichi2.themes.Themes;
+import com.ichi2.ui.AppCompatPreferenceActivity;
+import com.ichi2.ui.SeekBarPreference;
 import com.ichi2.anim.ActivityTransitionAnimation;
-import com.ichi2.anki.contextmenu.CardBrowserContextMenu;
-import com.ichi2.anki.debug.DatabaseLock;
-import com.ichi2.anki.exception.ConfirmModSchemaException;
 import com.ichi2.anki.exception.StorageAccessException;
-import com.ichi2.anki.services.BootService;
-import com.ichi2.anki.services.NotificationService;
-import com.ichi2.anki.web.CustomSyncServer;
 import com.ichi2.compat.CompatHelper;
 import com.ichi2.libanki.Collection;
 import com.ichi2.libanki.Utils;
 import com.ichi2.libanki.hooks.ChessFilter;
+import com.ichi2.libanki.hooks.HebrewFixFilter;
+import com.ichi2.libanki.hooks.Hooks;
 import com.ichi2.preferences.NumberRangePreference;
-import com.ichi2.themes.Themes;
-import com.ichi2.ui.AppCompatPreferenceActivity;
-import com.ichi2.ui.ConfirmationPreference;
-import com.ichi2.ui.SeekBarPreference;
-import com.ichi2.utils.AdaptionUtil;
 import com.ichi2.utils.LanguageUtil;
-import com.ichi2.anki.analytics.UsageAnalytics;
 import com.ichi2.utils.VersionUtils;
 
-import com.ichi2.utils.JSONObject;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.nio.channels.FileChannel;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -101,32 +89,44 @@ interface PreferenceContext {
  */
 public class Preferences extends AppCompatPreferenceActivity implements PreferenceContext, OnSharedPreferenceChangeListener {
 
+    private static final int DIALOG_HEBREW_FONT = 3;
+
     /** Key of the language preference */
     public static final String LANGUAGE = "language";
-
-    /* Only enable AnkiDroid notifications unrelated to due reminders */
-    public static final int PENDING_NOTIFICATIONS_ONLY = 1000000;
 
     // Other variables
     private final HashMap<String, String> mOriginalSumarries = new HashMap<>();
     private static final String [] sCollectionPreferences = {"showEstimates", "showProgress",
-            "learnCutoff", "timeLimit", "useCurrent", "newSpread", "dayOffset", "schedVer"};
+            "learnCutoff", "timeLimit", "useCurrent", "newSpread", "dayOffset"};
 
-    private static final int RESULT_LOAD_IMG = 111;
-    private CheckBoxPreference backgroundImage;
-    private static long fileLength;
+
     // ----------------------------------------------------------------------------
     // Overridden methods
     // ----------------------------------------------------------------------------
+
+    @SuppressWarnings("deprecation")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Themes.setThemeLegacy(this);
+
         super.onCreate(savedInstanceState);
+
+        // Legacy code using intents instead of PreferenceFragments
+        String action = getIntent().getAction();
+        if (!CompatHelper.isHoneycomb()) {
+            if (action == null) {
+                // Headers screen
+                addPreferencesFromResource(R.xml.preference_headers_legacy);
+            } else {
+                initSubscreen(action, this);
+            }
+            // Set the text for the summary of each of the preferences
+            initAllPreferences(getPreferenceScreen());
+        }
 
         // Add a home button to the actionbar
         getSupportActionBar().setHomeButtonEnabled(true);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        setTitle(getResources().getText(R.string.preferences_title));
     }
 
     private Collection getCol() {
@@ -134,16 +134,11 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
     }
 
 
+    // Called only on Honeycomb and later
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @Override
     public void onBuildHeaders(List<Header> target) {
         loadHeadersFromResource(R.xml.preference_headers, target);
-        Iterator iterator = target.iterator();
-        while (iterator.hasNext()) {
-            Header header = (Header)iterator.next();
-            if ((header.titleRes == R.string.pref_cat_advanced) && AdaptionUtil.isRestrictedLearningDevice()){
-                iterator.remove();
-            }
-        }
     }
 
 
@@ -157,10 +152,72 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case android.R.id.home:
-                onBackPressed();
+                finish();
                 return true;
         }
         return false;
+    }
+
+
+    @SuppressWarnings("deprecation")
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Legacy code to register listener when not using PreferenceFragment
+        if (!CompatHelper.isHoneycomb() && getPreferenceScreen() != null) {
+            getPreferenceScreen().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
+        }
+    }
+
+
+    @SuppressWarnings("deprecation")
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Legacy code to register listener when not using PreferenceFragment
+        if (!CompatHelper.isHoneycomb() && getPreferenceScreen() != null) {
+            SharedPreferences prefs = getPreferenceScreen().getSharedPreferences();
+            prefs.registerOnSharedPreferenceChangeListener(this);
+            // syncAccount's summary can change while preferences are still open (user logs
+            // in from preferences screen), so we need to update it here.
+            updatePreference(prefs, "syncAccount", this);
+            updatePreference(prefs, "custom_sync_server_link", this);
+            updatePreference(prefs, "advanced_statistics_link", this);
+        }
+    }
+
+
+    @Override
+    public boolean onKeyDown(int keyCode, @NonNull KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0) {
+            Timber.i("Preferences:: onBackPressed()");
+            closePreferences();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    protected MaterialDialog onCreateDialog(int id) {
+        Resources res = getResources();
+        MaterialDialog.Builder builder = new MaterialDialog.Builder(this);
+        switch (id) {
+            case DIALOG_HEBREW_FONT:
+                builder.title(res.getString(R.string.fix_hebrew_text));
+                builder.content(res.getString(R.string.fix_hebrew_instructions,
+                        CollectionHelper.getCurrentAnkiDroidDirectory(this)));
+                builder.callback(new MaterialDialog.ButtonCallback() {
+                    @Override
+                    public void onPositive(MaterialDialog dialog) {
+                        Intent intent = new Intent("android.intent.action.VIEW", Uri.parse(getResources().getString(
+                                R.string.link_hebrew_font)));
+                        startActivity(intent);
+                    }
+                });
+                builder.positiveText(res.getString(R.string.fix_hebrew_download_font));
+                builder.negativeText(R.string.dialog_cancel);
+        }
+        return builder.show();
     }
 
     @Override
@@ -173,29 +230,12 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
     // Class methods
     // ----------------------------------------------------------------------------
 
-    public static Intent getPreferenceSubscreenIntent(Context context, String subscreen) {
-        Intent i = new Intent(context, Preferences.class);
-        i.putExtra(PreferenceActivity.EXTRA_SHOW_FRAGMENT, "com.ichi2.anki.Preferences$SettingsFragment");
-        Bundle extras = new Bundle();
-        extras.putString("subscreen", subscreen);
-        i.putExtra(PreferenceActivity.EXTRA_SHOW_FRAGMENT_ARGUMENTS, extras);
-        i.putExtra(PreferenceActivity.EXTRA_NO_HEADERS, true);
-        return i;
-    }
     private void initSubscreen(String action, PreferenceContext listener) {
         PreferenceScreen screen;
         switch (action) {
             case "com.ichi2.anki.prefs.general":
                 listener.addPreferencesFromResource(R.xml.preferences_general);
                 screen = listener.getPreferenceScreen();
-                if (AdaptionUtil.isRestrictedLearningDevice()) {
-                    CheckBoxPreference mCheckBoxPref_Vibrate = (CheckBoxPreference) screen.findPreference("widgetVibrate");
-                    CheckBoxPreference mCheckBoxPref_Blink = (CheckBoxPreference) screen.findPreference("widgetBlink");
-                    PreferenceCategory mCategory = (PreferenceCategory) screen.findPreference("category_general_notification_pref");
-                    mCategory.removePreference(mCheckBoxPref_Vibrate);
-                    mCategory.removePreference(mCheckBoxPref_Blink);
-                }
-
                 // Build languages
                 initializeLanguageDialog(screen);
                 break;
@@ -205,54 +245,32 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                 // Show error toast if the user tries to disable answer button without gestures on
                 ListPreference fullscreenPreference = (ListPreference)
                         screen.findPreference("fullscreenMode");
-                fullscreenPreference.setOnPreferenceChangeListener((preference, newValue) -> {
-                    SharedPreferences prefs = AnkiDroidApp.getSharedPrefs(Preferences.this);
-                    if (prefs.getBoolean("gestures", false) || !"2".equals(newValue)) {
-                        return true;
-                    } else {
-                        Toast.makeText(getApplicationContext(),
-                                R.string.full_screen_error_gestures, Toast.LENGTH_LONG).show();
-                        return false;
+                fullscreenPreference.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+                    public boolean onPreferenceChange(Preference preference, final Object newValue) {
+                        SharedPreferences prefs = AnkiDroidApp.getSharedPrefs(Preferences.this);
+                        if (prefs.getBoolean("gestures", false) || !newValue.equals("2")) {
+                            return true;
+                        } else {
+                            Toast.makeText(getApplicationContext(),
+                                    R.string.full_screen_error_gestures, Toast.LENGTH_LONG).show();
+                            return false;
+                        }
                     }
                 });
                 // Custom buttons options
                 Preference customButtonsPreference = screen.findPreference("custom_buttons_link");
-                customButtonsPreference.setOnPreferenceClickListener(preference -> {
-                    Intent i = getPreferenceSubscreenIntent(Preferences.this,
-                            "com.ichi2.anki.prefs.custom_buttons");
-                    startActivity(i);
-                    return true;
+                customButtonsPreference.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+                    public boolean onPreferenceClick(Preference preference) {
+                        Intent i = CompatHelper.getCompat().getPreferenceSubscreenIntent(Preferences.this,
+                                "com.ichi2.anki.prefs.custom_buttons");
+                        startActivity(i);
+                        return true;
+                    }
                 });
                 break;
             case "com.ichi2.anki.prefs.appearance":
                 listener.addPreferencesFromResource(R.xml.preferences_appearance);
                 screen = listener.getPreferenceScreen();
-                backgroundImage = (CheckBoxPreference) screen.findPreference("deckPickerBackground");
-                backgroundImage.setOnPreferenceClickListener(preference -> {
-                    if (backgroundImage.isChecked()) {
-                        try {
-                            Intent galleryIntent = new Intent(Intent.ACTION_PICK,android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-                            startActivityForResult(galleryIntent, RESULT_LOAD_IMG);
-                            backgroundImage.setChecked(true);
-                        } catch (Exception ex) {
-                            Timber.e("%s",ex.getLocalizedMessage());
-                        }
-                    } else {
-                        backgroundImage.setChecked(false);
-                        String currentAnkiDroidDirectory = CollectionHelper.getCurrentAnkiDroidDirectory(this);
-                        File imgFile = new File(currentAnkiDroidDirectory, "DeckPickerBackground.png" );
-                        if (imgFile.exists()) {
-                            if (imgFile.delete()) {
-                                UIUtils.showThemedToast(this, getString(R.string.background_image_removed), false);
-                            } else {
-                                UIUtils.showThemedToast(this, getString(R.string.error_deleting_image), false);
-                            }
-                        } else {
-                            UIUtils.showThemedToast(this, getString(R.string.background_image_removed), false);
-                        }
-                    }
-                    return true;
-                });
                 initializeCustomFontsDialog(screen);
                 break;
             case "com.ichi2.anki.prefs.gestures":
@@ -264,26 +282,26 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                 screen = listener.getPreferenceScreen();
                 // Reset toolbar button customizations
                 Preference reset_custom_buttons = screen.findPreference("reset_custom_buttons");
-                reset_custom_buttons.setOnPreferenceClickListener(preference -> {
-                    SharedPreferences.Editor edit = AnkiDroidApp.getSharedPrefs(getBaseContext()).edit();
-                    edit.remove("customButtonUndo");
-                    edit.remove("customButtonScheduleCard");
-                    edit.remove("customButtonMarkCard");
-                    edit.remove("customButtonEditCard");
-                    edit.remove("customButtonAddCard");
-                    edit.remove("customButtonReplay");
-                    edit.remove("customButtonSelectTts");
-                    edit.remove("customButtonDeckOptions");
-                    edit.remove("customButtonBury");
-                    edit.remove("customButtonSuspend");
-                    edit.remove("customButtonFlag");
-                    edit.remove("customButtonDelete");
-                    edit.remove("customButtonClearWhiteboard");
-                    edit.remove("customButtonShowHideWhiteboard");
-                    edit.apply();
-                    //finish();
-                    //TODO: Should reload the preferences screen on completion
-                    return true;
+                reset_custom_buttons.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+                    public boolean onPreferenceClick(Preference preference) {
+                        SharedPreferences.Editor edit = AnkiDroidApp.getSharedPrefs(getBaseContext()).edit();
+                        edit.remove("customButtonUndo");
+                        edit.remove("customButtonMarkCard");
+                        edit.remove("customButtonEditCard");
+                        edit.remove("customButtonAddCard");
+                        edit.remove("customButtonReplay");
+                        edit.remove("customButtonSelectTts");
+                        edit.remove("customButtonDeckOptions");
+                        edit.remove("customButtonBury");
+                        edit.remove("customButtonSuspend");
+                        edit.remove("customButtonDelete");
+                        edit.remove("customButtonClearWhiteboard");
+                        edit.remove("customButtonShowHideWhiteboard");
+                        edit.apply();
+                        //finish();
+                        //TODO: Should reload the preferences screen on completion
+                        return true;
+                    }
                 });
                 break;
             case "com.ichi2.anki.prefs.advanced":
@@ -291,198 +309,62 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                 screen = listener.getPreferenceScreen();
                 // Check that input is valid before committing change in the collection path
                 EditTextPreference collectionPathPreference = (EditTextPreference) screen.findPreference("deckPath");
-                collectionPathPreference.setOnPreferenceChangeListener((preference, newValue) -> {
-                    final String newPath = (String) newValue;
-                    try {
-                        CollectionHelper.initializeAnkiDroidDirectory(newPath);
-                        return true;
-                    } catch (StorageAccessException e) {
-                        Timber.e(e, "Could not initialize directory: %s", newPath);
-                        Toast.makeText(getApplicationContext(), R.string.dialog_collection_path_not_dir, Toast.LENGTH_LONG).show();
-                        return false;
+                collectionPathPreference.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+                    public boolean onPreferenceChange(Preference preference, final Object newValue) {
+                        final String newPath = (String) newValue;
+                        try {
+                            CollectionHelper.initializeAnkiDroidDirectory(newPath);
+                            return true;
+                        } catch (StorageAccessException e) {
+                            Timber.e(e, "Could not initialize directory: %s", newPath);
+                            Toast.makeText(getApplicationContext(), R.string.dialog_collection_path_not_dir, Toast.LENGTH_LONG).show();
+                            return false;
+                        }
                     }
                 });
                 // Custom sync server option
                 Preference customSyncServerPreference = screen.findPreference("custom_sync_server_link");
-                customSyncServerPreference.setOnPreferenceClickListener(preference -> {
-                    Intent i = getPreferenceSubscreenIntent(Preferences.this,
-                            "com.ichi2.anki.prefs.custom_sync_server");
-                    startActivity(i);
-                    return true;
+                customSyncServerPreference.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+                    public boolean onPreferenceClick(Preference preference) {
+                        Intent i = CompatHelper.getCompat().getPreferenceSubscreenIntent(Preferences.this,
+                                "com.ichi2.anki.prefs.custom_sync_server");
+                        startActivity(i);
+                        return true;
+                    }
                 });
                 // Advanced statistics option
                 Preference advancedStatisticsPreference = screen.findPreference("advanced_statistics_link");
-                advancedStatisticsPreference.setOnPreferenceClickListener(preference -> {
-                    Intent i = getPreferenceSubscreenIntent(Preferences.this,
-                            "com.ichi2.anki.prefs.advanced_statistics");
-                    startActivity(i);
-                    return true;
-                });
-                // FIXME: The menu is named in the system language (as it's defined in the manifest which may be
-                //  different than the app language
-                CheckBoxPreference cardBrowserContextMenuPreference = (CheckBoxPreference) screen.findPreference(CardBrowserContextMenu.CARD_BROWSER_CONTEXT_MENU_PREF_KEY);
-                String menuName = getString(R.string.card_browser_context_menu);
-                cardBrowserContextMenuPreference.setTitle(getString(R.string.card_browser_enable_external_context_menu, menuName));
-                cardBrowserContextMenuPreference.setSummary(getString(R.string.card_browser_enable_external_context_menu_summary, menuName));
-
-                // Make it possible to test crash reporting, but only for DEBUG builds
-                if (BuildConfig.DEBUG && !ActivityManager.isUserAMonkey()) {
-                    Timber.i("Debug mode, allowing for test crashes");
-                    Preference triggerTestCrashPreference = new Preference(this);
-                    triggerTestCrashPreference.setKey("trigger_crash_preference");
-                    triggerTestCrashPreference.setTitle("Trigger test crash");
-                    triggerTestCrashPreference.setSummary("Touch here for an immediate test crash");
-                    triggerTestCrashPreference.setOnPreferenceClickListener(preference -> {
-                        Timber.w("Crash triggered on purpose from advanced preferences in debug mode");
-                        throw new RuntimeException("This is a test crash");
-                    });
-                    screen.addPreference(triggerTestCrashPreference);
-                }
-                // Make it possible to test analytics, but only for DEBUG builds
-                if (BuildConfig.DEBUG) {
-                    Timber.i("Debug mode, allowing for dynamic analytics config");
-                    Preference analyticsDebugMode = new Preference(this);
-                    analyticsDebugMode.setKey("analytics_debug_preference");
-                    analyticsDebugMode.setTitle("Switch Analytics to dev mode");
-                    analyticsDebugMode.setSummary("Touch here to use Analytics dev tag and 100% sample rate");
-                    analyticsDebugMode.setOnPreferenceClickListener(preference -> {
-                        UsageAnalytics.setDevMode();
+                advancedStatisticsPreference.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+                    public boolean onPreferenceClick(Preference preference) {
+                        Intent i = CompatHelper.getCompat().getPreferenceSubscreenIntent(Preferences.this,
+                                "com.ichi2.anki.prefs.advanced_statistics");
+                        startActivity(i);
                         return true;
-                    });
-                    screen.addPreference(analyticsDebugMode);
-                }
-                if (BuildConfig.DEBUG) {
-                    Timber.i("Debug mode, allowing database lock preference");
-                    Preference lockDbPreference = new Preference(this);
-                    lockDbPreference.setKey("debug_lock_database");
-                    lockDbPreference.setTitle("Lock Database");
-                    lockDbPreference.setSummary("Touch here to lock the database (all threads block in-process, exception if using second process)");
-                    lockDbPreference.setOnPreferenceClickListener(preference -> {
-                        DatabaseLock.engage(this);
-                        return true;
-                    });
-                    screen.addPreference(lockDbPreference);
-                }
-                // Force full sync option
-                ConfirmationPreference fullSyncPreference = (ConfirmationPreference)screen.findPreference("force_full_sync");
-                fullSyncPreference.setDialogMessage(R.string.force_full_sync_summary);
-                fullSyncPreference.setDialogTitle(R.string.force_full_sync_title);
-                fullSyncPreference.setOkHandler(() -> {
-                    if (getCol() == null) {
-                        Toast.makeText(getApplicationContext(), R.string.directory_inaccessible, Toast.LENGTH_LONG).show();
-                        return;
                     }
-                    getCol().modSchemaNoCheck();
-                    getCol().setMod();
-                    Toast.makeText(getApplicationContext(), android.R.string.ok, Toast.LENGTH_SHORT).show();
+                });
+                // Force full sync option
+                Preference fullSyncPreference = screen.findPreference("force_full_sync");
+                fullSyncPreference.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+                    public boolean onPreferenceClick(Preference preference) {
+                        // TODO: Could be useful to show the full confirmation dialog
+                        getCol().modSchemaNoCheck();
+                        getCol().setMod();
+                        Toast.makeText(getApplicationContext(), android.R.string.ok, Toast.LENGTH_SHORT).show();
+                        return true;
+                    }
                 });
                 // Workaround preferences
                 removeUnnecessaryAdvancedPrefs(screen);
-                addThirdPartyAppsListener(screen);
                 break;
             case "com.ichi2.anki.prefs.custom_sync_server":
                 getSupportActionBar().setTitle(R.string.custom_sync_server_title);
                 listener.addPreferencesFromResource(R.xml.preferences_custom_sync_server);
-                screen = listener.getPreferenceScreen();
-                Preference syncUrlPreference = screen.findPreference("syncBaseUrl");
-                Preference mSyncUrlPreference = screen.findPreference("syncMediaUrl");
-                syncUrlPreference.setOnPreferenceChangeListener((Preference preference, Object newValue) -> {
-                    String newUrl = newValue.toString();
-                    if (!URLUtil.isValidUrl(newUrl)) {
-                         new AlertDialog.Builder(this)
-                                .setTitle(R.string.custom_sync_server_base_url_invalid)
-                                .setPositiveButton(R.string.dialog_ok, null)
-                                .show();
-
-                        return false;
-                    }
-
-                    return true;
-                });
-                mSyncUrlPreference.setOnPreferenceChangeListener((Preference preference, Object newValue) -> {
-                    String newUrl = newValue.toString();
-                    if (!URLUtil.isValidUrl(newUrl)) {
-                        new AlertDialog.Builder(this)
-                                .setTitle(R.string.custom_sync_server_media_url_invalid)
-                                .setPositiveButton(R.string.dialog_ok, null)
-                                .show();
-
-                        return false;
-                    }
-
-                    return true;
-                });
                 break;
             case "com.ichi2.anki.prefs.advanced_statistics":
                 getSupportActionBar().setTitle(R.string.advanced_statistics_title);
                 listener.addPreferencesFromResource(R.xml.preferences_advanced_statistics);
                 break;
         }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        // DEFECT #5973: Does not handle Google Drive downloads
-        try {
-            if (requestCode == RESULT_LOAD_IMG && resultCode == RESULT_OK && null != data) {
-                Cursor cursor = null;
-                Uri selectedImage = data.getData();
-                String[] filePathColumn = { MediaStore.Images.Media.DATA };
-                try {
-                    cursor = getContentResolver().query(selectedImage, filePathColumn, null, null, null);
-                    cursor.moveToFirst();
-                    int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-                    String imgPathString = cursor.getString(columnIndex);
-                    File sourceFile = new File(imgPathString);
-
-                    // file size in MB
-                    fileLength = sourceFile.length() / (1024 * 1024);
-
-                    String currentAnkiDroidDirectory = CollectionHelper.getCurrentAnkiDroidDirectory(this);
-                    String imageName = "DeckPickerBackground.png";
-                    File destFile = new File(currentAnkiDroidDirectory, imageName);
-                    // Image size less than 10 MB copied to AnkiDroid folder
-                    if (fileLength < 10) {
-                        try (FileChannel sourceChannel = new FileInputStream(sourceFile).getChannel();
-                             FileChannel destChannel = new FileOutputStream(destFile).getChannel()) {
-                            destChannel.transferFrom(sourceChannel, 0, sourceChannel.size());
-                            UIUtils.showThemedToast(this, getString(R.string.background_image_applied), false);
-                        }
-                    } else {
-                        backgroundImage.setChecked(false);
-                        UIUtils.showThemedToast(this, getString(R.string.image_max_size_allowed, 10), false);
-                    }
-                } finally {
-                    if (cursor != null) {
-                        cursor.close();
-                    }
-                }
-            } else {
-                backgroundImage.setChecked(false);
-                UIUtils.showThemedToast(this, getString(R.string.no_image_selected), false);
-            }
-        } catch (OutOfMemoryError | Exception e) {
-            UIUtils.showThemedToast(this, getString(R.string.error_selecting_image, e.getLocalizedMessage()), false);
-        }
-    }
-
-    private void addThirdPartyAppsListener(PreferenceScreen screen) {
-        //#5864 - some people don't have a browser so we can't use <intent>
-        //and need to handle the keypress ourself.
-        Preference showThirdParty = screen.findPreference("thirdpartyapps_link");
-        final String githubThirdPartyAppsUrl = "https://github.com/ankidroid/Anki-Android/wiki/Third-Party-Apps";
-        showThirdParty.setOnPreferenceClickListener((preference) -> {
-            try {
-                Intent openThirdPartyAppsIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(githubThirdPartyAppsUrl));
-                super.startActivity(openThirdPartyAppsIntent);
-            } catch (ActivityNotFoundException e) {
-                //We use a different message here. We have limited space in the snackbar
-                String error = getString(R.string.activity_start_failed_load_url, githubThirdPartyAppsUrl);
-                UIUtils.showSimpleSnackbar(this, error, false);
-            }
-            return true;
-        });
     }
 
 
@@ -545,11 +427,9 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                             calendar.setTimeInMillis(timestamp.getTime());
                             ((SeekBarPreference)pref).setValue(calendar.get(Calendar.HOUR_OF_DAY));
                             break;
-                        case "schedVer":
-                            ((CheckBoxPreference)pref).setChecked(conf.optInt("schedVer", 1) == 2);
                     }
-                } catch (NumberFormatException e) {
-                    throw new RuntimeException(e);
+                } catch (JSONException | NumberFormatException e) {
+                    throw new RuntimeException();
                 }
             } else {
                 // Disable Col preferences if Collection closed
@@ -572,23 +452,12 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
      * @param key key in prefs which is being updated
      * @param listener PreferenceActivity of PreferenceFragment which is hosting the preference
      */
-    @SuppressWarnings("deprecation") // Tracked as #5019 on github - convert to fragments
     private void updatePreference(SharedPreferences prefs, String key, PreferenceContext listener) {
         try {
             PreferenceScreen screen = listener.getPreferenceScreen();
             Preference pref = screen.findPreference(key);
-            if (pref == null) {
-                Timber.e("Preferences: no preference found for the key: %s", key);
-                return;
-            }
             // Handle special cases
             switch (key) {
-                case CustomSyncServer.PREFERENCE_CUSTOM_MEDIA_SYNC_URL:
-                case CustomSyncServer.PREFERENCE_CUSTOM_SYNC_BASE:
-                case CustomSyncServer.PREFERENCE_ENABLE_CUSTOM_SYNC_SERVER:
-                    //This may be a tad hasty - performed before "back" is pressed.
-                    CustomSyncServer.handleSyncServerPreferenceChange(getBaseContext());
-                    break;
                 case "timeoutAnswer": {
                     CheckBoxPreference keepScreenOn = (CheckBoxPreference) screen.findPreference("keepScreenOn");
                     keepScreenOn.setChecked(((CheckBoxPreference) pref).isChecked());
@@ -596,6 +465,28 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                 }
                 case LANGUAGE:
                     closePreferences();
+                    break;
+                case "convertFenText":
+                    if (((CheckBoxPreference) pref).isChecked()) {
+                        ChessFilter.install(Hooks.getInstance(getApplicationContext()));
+                    } else {
+                        ChessFilter.uninstall(Hooks.getInstance(getApplicationContext()));
+                    }
+                    break;
+                case "fixHebrewText":
+                    if (((CheckBoxPreference) pref).isChecked()) {
+                        HebrewFixFilter.install(Hooks.getInstance(getApplicationContext()));
+                        showDialog(DIALOG_HEBREW_FONT);
+                    } else {
+                        HebrewFixFilter.uninstall(Hooks.getInstance(getApplicationContext()));
+                    }
+                    break;
+                case "advanced_statistics_enabled":
+                    if (((CheckBoxPreference) pref).isChecked()) {
+                        AdvancedStatistics.install(Hooks.getInstance(getApplicationContext()));
+                    } else {
+                        AdvancedStatistics.uninstall(Hooks.getInstance(getApplicationContext()));
+                    }
                     break;
                 case "showProgress":
                     getCol().getConf().put("dueCounts", ((CheckBoxPreference) pref).isChecked());
@@ -618,7 +509,7 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                     getCol().setMod();
                     break;
                 case "useCurrent":
-                    getCol().getConf().put("addToCur", "0".equals(((ListPreference) pref).getValue()));
+                    getCol().getConf().put("addToCur", ((ListPreference) pref).getValue().equals("0"));
                     getCol().setMod();
                     break;
                 case "dayOffset": {
@@ -629,31 +520,19 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                     date.set(Calendar.HOUR_OF_DAY, hours);
                     getCol().setCrt(date.getTimeInMillis() / 1000);
                     getCol().setMod();
-                    BootService.scheduleNotification(this);
                     break;
                 }
                 case "minimumCardsDueForNotification": {
                     ListPreference listpref = (ListPreference) screen.findPreference("minimumCardsDueForNotification");
                     if (listpref != null) {
                         updateNotificationPreference(listpref);
-                        if (Integer.valueOf(listpref.getValue()) < PENDING_NOTIFICATIONS_ONLY) {
-                            BootService.scheduleNotification(this);
-                        } else {
-                            PendingIntent intent = PendingIntent.getBroadcast(this, 0,
-                                    new Intent(this, NotificationService.class), 0);
-                            final AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
-                            alarmManager.cancel(intent);
-                        }
                     }
                     break;
                 }
-                case AnkiDroidApp.FEEDBACK_REPORT_KEY: {
-                    String value = prefs.getString(AnkiDroidApp.FEEDBACK_REPORT_KEY, "");
+                case "reportErrorMode": {
+                    String value = prefs.getString("reportErrorMode", "");
                     AnkiDroidApp.getInstance().setAcraReportingMode(value);
-                    // If the user changed error reporting, make sure future reports have a chance to post
-                    AnkiDroidApp.deleteACRALimiterData(this);
-                    // We also need to re-chain our UncaughtExceptionHandlers
-                    UsageAnalytics.reInitialize();
+                    AnkiDroidApp.getSharedPrefs(this).edit().remove("sentExceptionReports").apply();    // clear cache
                     break;
                 }
                 case "syncAccount": {
@@ -683,66 +562,13 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                     pm.setComponentEnabledSetting(providerName, state, PackageManager.DONT_KILL_APP);
                     break;
                 }
-                case "schedVer": {
-                    boolean wantNew = ((CheckBoxPreference) pref).isChecked();
-                    boolean haveNew = getCol().schedVer() == 2;
-                    // northing to do?
-                    if (haveNew == wantNew) {
-                        break;
-                    }
-                    MaterialDialog.Builder builder = new MaterialDialog.Builder(this);
-                    if (haveNew && !wantNew) {
-                        // Going back to V1
-                        builder.title(R.string.sched_ver_toggle_title);
-                        builder.content(R.string.sched_ver_2to1);
-                        builder.onPositive((dialog, which) -> {
-                            getCol().modSchemaNoCheck();
-                            try {
-                                getCol().changeSchedulerVer(1);
-                                ((CheckBoxPreference) pref).setChecked(false);
-                            } catch (ConfirmModSchemaException e2) {
-                                // This should never be reached as we explicitly called modSchemaNoCheck()
-                                throw new RuntimeException(e2);
-                            }
-                        });
-                        builder.onNegative((dialog, which) -> {
-                            ((CheckBoxPreference) pref).setChecked(true);
-                        });
-                        builder.positiveText(R.string.dialog_ok);
-                        builder.negativeText(R.string.dialog_cancel);
-                        builder.show();
-                        break;
-                    }
-                    // Going to V2
-                    builder.title(R.string.sched_ver_toggle_title);
-                    builder.content(R.string.sched_ver_1to2);
-                    builder.onPositive((dialog, which) -> {
-                        getCol().modSchemaNoCheck();
-                        try {
-                            getCol().changeSchedulerVer(2);
-                            ((CheckBoxPreference) pref).setChecked(true);
-                        } catch (ConfirmModSchemaException e2) {
-                            // This should never be reached as we explicitly called modSchemaNoCheck()
-                            throw new RuntimeException(e2);
-                        }
-                    });
-                    builder.onNegative((dialog, which) -> {
-                        ((CheckBoxPreference) pref).setChecked(false);
-                    });
-                    builder.positiveText(R.string.dialog_ok);
-                    builder.negativeText(R.string.dialog_cancel);
-                    builder.show();
-                    break;
-                }
-                case CardBrowserContextMenu.CARD_BROWSER_CONTEXT_MENU_PREF_KEY:
-                    CardBrowserContextMenu.ensureConsistentStateWithSharedPreferences(this);
             }
             // Update the summary text to reflect new value
             updateSummary(pref);
         } catch (BadTokenException e) {
             Timber.e(e, "Preferences: BadTokenException on showDialog");
-        } catch (NumberFormatException e) {
-            throw new RuntimeException(e);
+        } catch (NumberFormatException | JSONException e) {
+            throw new RuntimeException();
         }
     }
 
@@ -764,25 +590,21 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
             return;
         }
         // Handle special cases
-        switch (pref.getKey()) {
-            case "about_dialog_preference":
-                pref.setSummary(getResources().getString(R.string.about_version) + " " + VersionUtils.getPkgVersionName());
-                break;
-            case "custom_sync_server_link":
-                SharedPreferences preferences = AnkiDroidApp.getSharedPrefs(this);
-                if (!CustomSyncServer.isEnabled(preferences)) {
-                    pref.setSummary(R.string.disabled);
-                } else {
-                    pref.setSummary(CustomSyncServer.getSyncBaseUrlOrDefault(preferences, ""));
-                }
-                break;
-            case "advanced_statistics_link":
-                if (!AnkiDroidApp.getSharedPrefs(this).getBoolean("advanced_statistics_enabled", false)) {
-                    pref.setSummary(R.string.disabled);
-                } else {
-                    pref.setSummary(R.string.enabled);
-                }
-                break;
+        if (pref.getKey().equals("about_dialog_preference")) {
+            pref.setSummary(getResources().getString(R.string.about_version) + " " + VersionUtils.getPkgVersionName());
+        } else if (pref.getKey().equals("custom_sync_server_link")) {
+            if (!AnkiDroidApp.getSharedPrefs(this).getBoolean("useCustomSyncServer", false)) {
+                pref.setSummary(R.string.disabled);
+            } else {
+                pref.setSummary(AnkiDroidApp.getSharedPrefs(this).getString("syncBaseUrl", ""));
+            }
+        }
+          else if (pref.getKey().equals("advanced_statistics_link")) {
+            if (!AnkiDroidApp.getSharedPrefs(this).getBoolean("advanced_statistics_enabled", false)) {
+                pref.setSummary(R.string.disabled);
+            } else {
+                pref.setSummary(R.string.enabled);
+            }
         }
         // Get value text
         String value;
@@ -804,11 +626,11 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
         // Get summary text
         String oldSummary = mOriginalSumarries.get(pref.getKey());
         // Replace summary text with value according to some rules
-        if ("".equals(oldSummary)) {
+        if (oldSummary.equals("")) {
             pref.setSummary(value);
-        } else if ("".equals(value)) {
+        } else if (value.equals("")) {
             pref.setSummary(oldSummary);
-        } else if ("minimumCardsDueForNotification".equals(pref.getKey())) {
+        } else if (pref.getKey().equals("minimumCardsDueForNotification")) {
             pref.setSummary(replaceStringIfNumeric(oldSummary, value));
         } else {
             pref.setSummary(replaceString(oldSummary, value));
@@ -837,10 +659,10 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
     private void initializeLanguageDialog(PreferenceScreen screen) {
         ListPreference languageSelection = (ListPreference) screen.findPreference(LANGUAGE);
         if (languageSelection != null) {
-            Map<String, String> items = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+            Map<String, String> items = new TreeMap<>();
             for (String localeCode : LanguageUtil.APP_LANGUAGES) {
                 Locale loc = LanguageUtil.getLocale(localeCode);
-                items.put(loc.getDisplayName(loc), loc.toString());
+                items.put(loc.getDisplayName(), loc.toString());
             }
             CharSequence[] languageDialogLabels = new CharSequence[items.size() + 1];
             CharSequence[] languageDialogValues = new CharSequence[items.size() + 1];
@@ -872,6 +694,34 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
             CheckBoxPreference doubleScrolling = (CheckBoxPreference) screen.findPreference("double_scrolling");
             if (doubleScrolling != null && plugins != null) {
                 plugins.removePreference(doubleScrolling);
+            }
+        }
+
+        PreferenceCategory workarounds = (PreferenceCategory) screen.findPreference("category_workarounds");
+        if (workarounds != null) {
+            CheckBoxPreference writeAnswersDisable = (CheckBoxPreference) screen.findPreference("writeAnswersDisable");
+            CheckBoxPreference useInputTag = (CheckBoxPreference) screen.findPreference("useInputTag");
+            CheckBoxPreference inputWorkaround = (CheckBoxPreference) screen.findPreference("inputWorkaround");
+            CheckBoxPreference longclickWorkaround =
+                (CheckBoxPreference) screen.findPreference("textSelectionLongclickWorkaround");
+            CheckBoxPreference fixHebrewText = (CheckBoxPreference) screen.findPreference("fixHebrewText");
+            CheckBoxPreference safeDisplayMode = (CheckBoxPreference) screen.findPreference("safeDisplay");
+            CompatHelper.removeHiddenPreferences(this.getApplicationContext());
+            if (CompatHelper.isHoneycomb()) {
+                workarounds.removePreference(longclickWorkaround);
+            }
+            if (CompatHelper.getSdkVersion() >= 13) {
+                workarounds.removePreference(safeDisplayMode);
+            }
+            if (CompatHelper.getSdkVersion() >= 15) {
+                workarounds.removePreference(writeAnswersDisable);
+                workarounds.removePreference(inputWorkaround);
+            } else {
+                // For older Androids we never use the input tag anyway.
+                workarounds.removePreference(useInputTag);
+            }
+            if (CompatHelper.getSdkVersion() >= 16) {
+                workarounds.removePreference(fixHebrewText);
             }
         }
     }
@@ -929,13 +779,12 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
     // Inner classes
     // ----------------------------------------------------------------------------
 
-    @SuppressWarnings("deprecation") // Tracked as #5019 on github
-    public static class SettingsFragment extends android.preference.PreferenceFragment implements PreferenceContext, OnSharedPreferenceChangeListener {
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    public static class SettingsFragment extends PreferenceFragment implements PreferenceContext, OnSharedPreferenceChangeListener {
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
             String subscreen = getArguments().getString("subscreen");
-            UsageAnalytics.sendAnalyticsScreenView(subscreen.replaceFirst("^com.ichi2.anki.", ""));
             ((Preferences) getActivity()).initSubscreen(subscreen, this);
             ((Preferences) getActivity()).initAllPreferences(getPreferenceScreen());
         }

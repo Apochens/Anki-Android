@@ -4,13 +4,13 @@ package com.ichi2.anki.dialogs;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.ichi2.anki.CardBrowser;
 import com.ichi2.anki.R;
-import com.ichi2.anki.analytics.AnalyticsDialogFragment;
 
 import android.app.Dialog;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.v4.app.DialogFragment;
 
-public class CardBrowserOrderDialog extends AnalyticsDialogFragment {
+public class CardBrowserOrderDialog extends DialogFragment {
 
     private static MaterialDialog.ListCallbackSingleChoice mOrderDialogListener;
 
@@ -39,6 +39,7 @@ public class CardBrowserOrderDialog extends AnalyticsDialogFragment {
                     items[i] = items[i] + " (\u25b2)";
                 } else {
                     items[i] = items[i] + " (\u25bc)";
+
                 }
             }
         }

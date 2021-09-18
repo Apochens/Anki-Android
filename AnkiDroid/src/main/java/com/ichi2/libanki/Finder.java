@@ -24,13 +24,12 @@ import android.text.TextUtils;
 
 import android.util.Pair;
 
-import com.ichi2.anki.CardBrowser;
-import com.ichi2.async.CollectionTask;
+import com.ichi2.async.DeckTask;
 
-import com.ichi2.utils.JSONArray;
-import com.ichi2.utils.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,10 +44,8 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import androidx.annotation.CheckResult;
 import timber.log.Timber;
 
-@SuppressWarnings({"PMD.ExcessiveClassLength", "PMD.AvoidThrowingRawExceptionTypes","PMD.AvoidReassigningParameters","PMD.NPathComplexity","PMD.MethodNamingConventions"})
 public class Finder {
 
     private static final Pattern fPropPattern = Pattern.compile("(^.+?)(<=|>=|!=|=|<|>)(.+?$)");
@@ -70,29 +67,22 @@ public class Finder {
      */
 
     /** Return a list of card ids for QUERY */
-    @CheckResult
+    public List<Long> findCards(String query) {
+        return findCards(query, false);
+    }
+
+
     public List<Long> findCards(String query, String _order) {
         return _findCards(query, _order);
     }
 
-    @CheckResult
+
     public List<Long> findCards(String query, boolean _order) {
-        return findCards(query, _order, null);
-    }
-
-    @CheckResult
-    public List<Long> findCards(String query, boolean _order, CollectionTask task) {
-        return _findCards(query, _order, task);
+        return _findCards(query, _order);
     }
 
 
-    @CheckResult
     private List<Long> _findCards(String query, Object _order) {
-        return _findCards(query, _order, null);
-    }
-
-    @CheckResult
-    private List<Long> _findCards(String query, Object _order, CollectionTask task) {
         String[] tokens = _tokenize(query);
         Pair<String, String[]> res1 = _where(tokens);
         String preds = res1.first;
@@ -105,16 +95,19 @@ public class Finder {
         String order = res2.first;
         boolean rev = res2.second;
         String sql = _query(preds, order);
-        try (Cursor cur = mCol.getDb().getDatabase().query(sql, args)) {
+        Cursor cur = null;
+        try {
+            cur = mCol.getDb().getDatabase().rawQuery(sql, args);
             while (cur.moveToNext()) {
-                if (task != null && task.isCancelled()) {
-                    return new ArrayList<>();
-                }
                 res.add(cur.getLong(0));
             }
         } catch (SQLException e) {
             // invalid grouping
             return new ArrayList<>();
+        } finally {
+            if (cur != null) {
+                cur.close();
+            }
         }
         if (rev) {
             Collections.reverse(res);
@@ -132,19 +125,25 @@ public class Finder {
         if (preds == null) {
             return res;
         }
-        if ("".equals(preds)) {
+        if (preds.equals("")) {
             preds = "1";
         } else {
             preds = "(" + preds + ")";
         }
         String sql = "select distinct(n.id) from cards c, notes n where c.nid=n.id and " + preds;
-        try (Cursor cur = mCol.getDb().getDatabase().query(sql, args)) {
+        Cursor cur = null;
+        try {
+            cur = mCol.getDb().getDatabase().rawQuery(sql, args);
             while (cur.moveToNext()) {
                 res.add(cur.getLong(0));
             }
         } catch (SQLException e) {
             // invalid grouping
             return new ArrayList<>();
+        } finally {
+            if (cur != null) {
+                cur.close();
+            }
         }
         return res;
     }
@@ -203,7 +202,7 @@ public class Finder {
             } else if (c == '-') {
                 if (token.length() != 0) {
                     token += c;
-                } else if (tokens.size() == 0 || !"-".equals(tokens.get(tokens.size() - 1))) {
+                } else if (tokens.size() == 0 || !tokens.get(tokens.size() - 1).equals("-")) {
                     tokens.add("-");
                 }
                 // normal character
@@ -228,7 +227,7 @@ public class Finder {
      * LibAnki creates a dictionary and operates on it with an inner function inside _where().
      * AnkiDroid combines the two in this class instead.
      */
-    public static class SearchState {
+    public class SearchState {
         public boolean isnot;
         public boolean isor;
         public boolean join;
@@ -250,7 +249,7 @@ public class Finder {
                     bad = true;
                     return;
                 }
-            } else if ("skip".equals(txt)) {
+            } else if (txt.equals("skip")) {
                 return;
             }
             // do we need a conjunction?
@@ -275,7 +274,7 @@ public class Finder {
     }
 
 
-    private Pair<String, String[]> _where(String[] tokens) {
+    public Pair<String, String[]> _where(String[] tokens) {
         // state and query
         SearchState s = new SearchState();
         List<String> args = new ArrayList<>();
@@ -284,14 +283,14 @@ public class Finder {
                 return new Pair<>(null, null);
             }
             // special tokens
-            if ("-".equals(token)) {
+            if (token.equals("-")) {
                 s.isnot = true;
-            } else if ("or".equalsIgnoreCase(token)) {
+            } else if (token.equalsIgnoreCase("or")) {
                 s.isor = true;
-            } else if ("(".equals(token)) {
+            } else if (token.equals("(")) {
                 s.add(token, false);
                 s.join = false;
-            } else if (")".equals(token)) {
+            } else if (token.equals(")")) {
                 s.q += ")";
                 // commands
             } else if (token.contains(":")) {
@@ -299,31 +298,29 @@ public class Finder {
                 String cmd = spl[0].toLowerCase(Locale.US);
                 String val = spl[1];
                 
-                if ("added".equals(cmd)) {
+                if (cmd.equals("added")) {
                     s.add(_findAdded(val));
-                } else if ("card".equals(cmd)) {
+                } else if (cmd.equals("card")) {
                     s.add(_findTemplate(val));
-                } else if ("deck".equals(cmd)) {
+                } else if (cmd.equals("deck")) {
                     s.add(_findDeck(val));
-                } else if ("flag".equals(cmd)) {
-                    s.add(_findFlag(val));
-                } else if ("mid".equals(cmd)) {
+                } else if (cmd.equals("mid")) {
                     s.add(_findMid(val));
-                } else if ("nid".equals(cmd)) {
+                } else if (cmd.equals("nid")) {
                     s.add(_findNids(val));
-                } else if ("cid".equals(cmd)) {
+                } else if (cmd.equals("cid")) {
                     s.add(_findCids(val));
-                } else if ("note".equals(cmd)) {
+                } else if (cmd.equals("note")) {
                     s.add(_findModel(val));
-                } else if ("prop".equals(cmd)) {
+                } else if (cmd.equals("prop")) {
                     s.add(_findProp(val));
-                } else if ("rated".equals(cmd)) {
+                } else if (cmd.equals("rated")) {
                     s.add(_findRated(val));
-                } else if ("tag".equals(cmd)) {
+                } else if (cmd.equals("tag")) {
                     s.add(_findTag(val, args));
-                } else if ("dupe".equals(cmd)) {
+                } else if (cmd.equals("dupe")) {
                     s.add(_findDupes(val));
-                } else if ("is".equals(cmd)) {
+                } else if (cmd.equals("is")) {
                     s.add(_findCardState(val));
                 } else {
                     s.add(_findField(cmd, val));
@@ -390,38 +387,42 @@ public class Finder {
         if (!order) {
             return new Pair<>("", false);
         }
-        // use deck default
-        String type = mCol.getConf().getString("sortType");
-        String sort = null;
-        if (type.startsWith("note")) {
-            if (type.startsWith("noteCrt")) {
-                sort = "n.id, c.ord";
-            } else if (type.startsWith("noteMod")) {
-                sort = "n.mod, c.ord";
-            } else if (type.startsWith("noteFld")) {
-                sort = "n.sfld COLLATE NOCASE, c.ord";
+        try {
+            // use deck default
+            String type = mCol.getConf().getString("sortType");
+            String sort = null;
+            if (type.startsWith("note")) {
+                if (type.startsWith("noteCrt")) {
+                    sort = "n.id, c.ord";
+                } else if (type.startsWith("noteMod")) {
+                    sort = "n.mod, c.ord";
+                } else if (type.startsWith("noteFld")) {
+                    sort = "n.sfld COLLATE NOCASE, c.ord";
+                }
+            } else if (type.startsWith("card")) {
+                if (type.startsWith("cardMod")) {
+                    sort = "c.mod";
+                } else if (type.startsWith("cardReps")) {
+                    sort = "c.reps";
+                } else if (type.startsWith("cardDue")) {
+                    sort = "c.type, c.due";
+                } else if (type.startsWith("cardEase")) {
+                    sort = "c.factor";
+                } else if (type.startsWith("cardLapses")) {
+                    sort = "c.lapses";
+                } else if (type.startsWith("cardIvl")) {
+                    sort = "c.ivl";
+                }
             }
-        } else if (type.startsWith("card")) {
-            if (type.startsWith("cardMod")) {
-                sort = "c.mod";
-            } else if (type.startsWith("cardReps")) {
-                sort = "c.reps";
-            } else if (type.startsWith("cardDue")) {
-                sort = "c.type, c.due";
-            } else if (type.startsWith("cardEase")) {
-                sort = "c.type == " + Consts.CARD_TYPE_NEW + ", c.factor";
-            } else if (type.startsWith("cardLapses")) {
-                sort = "c.lapses";
-            } else if (type.startsWith("cardIvl")) {
-                sort = "c.ivl";
+            if (sort == null) {
+            	// deck has invalid sort order; revert to noteCrt
+            	sort = "n.id, c.ord";
             }
+            boolean sortBackwards = mCol.getConf().getBoolean("sortBackwards");
+            return new Pair<>(" ORDER BY " + sort, sortBackwards);
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
-        if (sort == null) {
-            // deck has invalid sort order; revert to noteCrt
-            sort = "n.id, c.ord";
-        }
-        boolean sortBackwards = mCol.getConf().getBoolean("sortBackwards");
-        return new Pair<>(" ORDER BY " + sort, sortBackwards);
     }
 
 
@@ -431,68 +432,44 @@ public class Finder {
      */
 
     private String _findTag(String val, List<String> args) {
-        if ("none".equals(val)) {
+        if (val.equals("none")) {
             return "n.tags = \"\"";
         }
         val = val.replace("*", "%");
         if (!val.startsWith("%")) {
             val = "% " + val;
         }
-        if (!val.endsWith("%") || val.endsWith("\\%")) {
+        if (!val.endsWith("%")) {
             val += " %";
         }
         args.add(val);
-        return "n.tags like ? escape '\\'";
+        return "n.tags like ?";
     }
 
 
     private String _findCardState(String val) {
         int n;
-        if ("review".equals(val) || "new".equals(val) || "learn".equals(val)) {
-            if ("review".equals(val)) {
+        if (val.equals("review") || val.equals("new") || val.equals("learn")) {
+            if (val.equals("review")) {
                 n = 2;
-            } else if ("new".equals(val)) {
+            } else if (val.equals("new")) {
                 n = 0;
             } else {
-                return "queue IN (1, " + Consts.QUEUE_TYPE_DAY_LEARN_RELEARN + ")";
+                return "queue IN (1, 3)";
             }
             return "type = " + n;
-        } else if ("suspended".equals(val)) {
-            return "c.queue = " + Consts.QUEUE_TYPE_SUSPENDED;
-        } else if ("buried".equals(val)) {
-            return "c.queue in (" + Consts.QUEUE_TYPE_SIBLING_BURIED + ", " + Consts.QUEUE_TYPE_MANUALLY_BURIED + ")";
-        } else if ("due".equals(val)) {
-            return "(c.queue in (" + Consts.QUEUE_TYPE_REV + "," + Consts.QUEUE_TYPE_DAY_LEARN_RELEARN + ") and c.due <= " + mCol.getSched().getToday() +
-                    ") or (c.queue = " + Consts.QUEUE_TYPE_LRN + " and c.due <= " + mCol.getSched().getDayCutoff() + ")";
+        } else if (val.equals("suspended")) {
+            return "c.queue = -1";
+        } else if (val.equals("buried")) {
+            return "c.queue = -2";
+        } else if (val.equals("due")) {
+            return "(c.queue in (2,3) and c.due <= " + mCol.getSched().getToday() +
+                    ") or (c.queue = 1 and c.due <= " + mCol.getSched().getDayCutoff() + ")";
         } else {
             return null;
         }
     }
 
-    private String _findFlag(String val) {
-        int flag;
-        switch (val) {
-        case "0":
-            flag = 0;
-            break;
-        case "1":
-            flag = 1;
-            break;
-        case "2":
-            flag = 2;
-            break;
-        case "3":
-            flag = 3;
-            break;
-        case "4":
-            flag = 4;
-            break;
-        default:
-            return null;
-        }
-        int mask = 0b111; // 2**3 -1 in Anki
-        return "(c.flags & "+mask+") == " + flag;
-    }
 
     private String _findRated(String val) {
         // days(:optional_ease)
@@ -541,7 +518,7 @@ public class Finder {
         int val;
         // is val valid?
         try {
-            if ("ease".equals(prop)) {
+            if (prop.equals("ease")) {
                 // LibAnki does this below, but we do it here to avoid keeping a separate float value.
                 val = (int)(Double.parseDouble(sval) * 1000);
             } else {
@@ -556,11 +533,11 @@ public class Finder {
         }
         // query
         String q = "";
-        if ("due".equals(prop)) {
+        if (prop.equals("due")) {
             val += mCol.getSched().getToday();
             // only valid for review/daily learning
-            q = "(c.queue in (" + Consts.QUEUE_TYPE_REV + "," + Consts.QUEUE_TYPE_DAY_LEARN_RELEARN + ")) and ";
-        } else if ("ease".equals(prop)) {
+            q = "(c.queue in (2,3)) and ";
+        } else if (prop.equals("ease")) {
             prop = "factor";
             // already done: val = int(val*1000)
         }
@@ -603,12 +580,14 @@ public class Finder {
 
     private String _findModel(String val) {
         LinkedList<Long> ids = new LinkedList<>();
-        for (JSONObject m : mCol.getModels().all()) {
-            String modelName = m.getString("name");
-            modelName = Normalizer.normalize(modelName, Normalizer.Form.NFC);
-            if (modelName.equalsIgnoreCase(val)) {
-                ids.add(m.getLong("id"));
+        try {
+            for (JSONObject m : mCol.getModels().all()) {
+                if (m.getString("name").equalsIgnoreCase(val)) {
+                    ids.add(m.getLong("id"));
+                }
             }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
         return "n.mid in " + Utils.ids2str(ids);
     }
@@ -628,35 +607,37 @@ public class Finder {
 
     public String _findDeck(String val) {
         // if searching for all decks, skip
-        if ("*".equals(val)) {
+        if (val.equals("*")) {
             return "skip";
             // deck types
-        } else if ("filtered".equals(val)) {
+        } else if (val.equals("filtered")) {
             return "c.odid";
         }
         List<Long> ids = null;
         // current deck?
-        if ("current".equalsIgnoreCase(val)) {
-            ids = dids(mCol.getDecks().selected());
-        } else if (!val.contains("*")) {
-            // single deck
-            ids = dids(mCol.getDecks().id(val, false));
-        } else {
-            // wildcard
-            ids = new ArrayList<>();
-            val = val.replace("*", ".*");
-            val = val.replace("+", "\\+");
-            for (JSONObject d : mCol.getDecks().all()) {
-                String deckName = d.getString("name");
-                deckName = Normalizer.normalize(deckName, Normalizer.Form.NFC);
-                if (deckName.matches("(?i)" + val)) {
-                    for (long id : dids(d.getLong("id"))) {
-                        if (!ids.contains(id)) {
-                            ids.add(id);
+        try {
+            if (val.equalsIgnoreCase("current")) {
+                ids = dids(mCol.getDecks().current().getLong("id"));
+            } else if (!val.contains("*")) {
+                // single deck
+                ids = dids(mCol.getDecks().id(val, false));
+            } else {
+                // wildcard
+                ids = new ArrayList<>();
+                val = val.replace("*", ".*");
+                val = val.replace("+", "\\+");
+                for (JSONObject d : mCol.getDecks().all()) {
+                    if (d.getString("name").matches("(?i)" + val)) {
+                        for (long id : dids(d.getLong("id"))) {
+                            if (!ids.contains(id)) {
+                                ids.add(id);
+                            }
                         }
                     }
                 }
             }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
         if (ids == null || ids.size() == 0) {
             return null;
@@ -679,24 +660,26 @@ public class Finder {
         }
         // search for template names
         List<String> lims = new ArrayList<>();
-        for (JSONObject m : mCol.getModels().all()) {
-            JSONArray tmpls = m.getJSONArray("tmpls");
-            for (int ti = 0; ti < tmpls.length(); ++ti) {
-                JSONObject t = tmpls.getJSONObject(ti);
-                String templateName = t.getString("name");
-                Normalizer.normalize(templateName, Normalizer.Form.NFC);
-                if (templateName.equalsIgnoreCase(val)) {
-                    if (m.getInt("type") == Consts.MODEL_CLOZE) {
-                        // if the user has asked for a cloze card, we want
-                        // to give all ordinals, so we just limit to the
-                        // model instead
-                        lims.add("(n.mid = " + m.getLong("id") + ")");
-                    } else {
-                        lims.add("(n.mid = " + m.getLong("id") + " and c.ord = " +
-                                t.getInt("ord") + ")");
+        try {
+            for (JSONObject m : mCol.getModels().all()) {
+                JSONArray tmpls = m.getJSONArray("tmpls");
+                for (int ti = 0; ti < tmpls.length(); ++ti) {
+                    JSONObject t = tmpls.getJSONObject(ti);
+                    if (t.getString("name").equalsIgnoreCase(val)) {
+                        if (m.getInt("type") == Consts.MODEL_CLOZE) {
+                            // if the user has asked for a cloze card, we want
+                            // to give all ordinals, so we just limit to the
+                            // model instead
+                            lims.add("(n.mid = " + m.getLong("id") + ")");
+                        } else {
+                            lims.add("(n.mid = " + m.getLong("id") + " and c.ord = " +
+                                    t.getInt("ord") + ")");
+                        }
                     }
                 }
             }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
         return TextUtils.join(" or ", lims.toArray(new String[lims.size()]));
     }
@@ -726,31 +709,35 @@ public class Finder {
 
         // find models that have that field
         Map<Long, Object[]> mods = new HashMap<>();
-        for (JSONObject m : mCol.getModels().all()) {
-            JSONArray flds = m.getJSONArray("flds");
-            for (int fi = 0; fi < flds.length(); ++fi) {
-                JSONObject f = flds.getJSONObject(fi);
-                String fieldName = f.getString("name");
-                fieldName = Normalizer.normalize(fieldName, Normalizer.Form.NFC);
-                if (fieldName.equalsIgnoreCase(field)) {
-                    mods.put(m.getLong("id"), new Object[] { m, f.getInt("ord") });
+        try {
+            for (JSONObject m : mCol.getModels().all()) {
+                JSONArray flds = m.getJSONArray("flds");
+                for (int fi = 0; fi < flds.length(); ++fi) {
+                    JSONObject f = flds.getJSONObject(fi);
+                    if (f.getString("name").equalsIgnoreCase(field)) {
+                        mods.put(m.getLong("id"), new Object[] { m, f.getInt("ord") });
+                    }
                 }
             }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
         if (mods.isEmpty()) {
             // nothing has that field
             return null;
         }
         LinkedList<Long> nids = new LinkedList<>();
-        try (Cursor cur = mCol.getDb().getDatabase().query(
-                "select id, mid, flds from notes where mid in " +
-                        Utils.ids2str(new LinkedList<>(mods.keySet())) +
-                        " and flds like ? escape '\\'", new String[] {"%" + sqlVal + "%"})) {
+        Cursor cur = null;
+        try {
             /*
              * Here we use the sqlVal expression, that is required for LIKE syntax in sqllite.
              * There is no problem with special characters, because only % and _ are special
              * characters in this syntax.
              */
+            cur = mCol.getDb().getDatabase().rawQuery(
+                    "select id, mid, flds from notes where mid in " +
+                            Utils.ids2str(new LinkedList<>(mods.keySet())) +
+                            " and flds like ? escape '\\'", new String[] { "%" + sqlVal + "%" });
 
             while (cur.moveToNext()) {
                 String[] flds = Utils.splitFields(cur.getString(2));
@@ -759,6 +746,10 @@ public class Finder {
                 if (pattern.matcher(strg).matches()) {
                     nids.add(cur.getLong(0));
                 }
+            }
+        } finally {
+            if (cur != null) {
+                cur.close();
             }
         }
         if (nids.isEmpty()) {
@@ -778,13 +769,19 @@ public class Finder {
         val = split[1];
         String csum = Long.toString(Utils.fieldChecksum(val));
         List<Long> nids = new ArrayList<>();
-        try (Cursor cur = mCol.getDb().getDatabase().query(
-                "select id, flds from notes where mid=? and csum=?",
-                new String[] {mid, csum})) {
+        Cursor cur = null;
+        try {
+            cur = mCol.getDb().getDatabase().rawQuery(
+                    "select id, flds from notes where mid=? and csum=?",
+                    new String[] { mid, csum });
             long nid = cur.getLong(0);
             String flds = cur.getString(1);
             if (Utils.stripHTMLMedia(Utils.splitFields(flds)[0]).equals(val)) {
                 nids.add(nid);
+            }
+        } finally {
+            if (cur != null) {
+                cur.close();
             }
         }
         return "n.id in " +  Utils.ids2str(nids);
@@ -803,63 +800,42 @@ public class Finder {
      * @param nids The cards to be searched for.
      * @param src The original text to find.
      * @param dst The text to change to.
-     * @return Number of notes with fields that were updated.
+     * @param regex If true, the src is treated as a regex. Default = false.
+     * @param field Limit the search to specific field. If null, it searches all fields.
+     * @param fold If true the search is case-insensitive. Default = true.
+     * @return
      */
     public static int findReplace(Collection col, List<Long> nids, String src, String dst) {
         return findReplace(col, nids, src, dst, false, null, true);
     }
 
-    /**
-     * Find and replace fields in a note
-     *
-     * @param col The collection to search into.
-     * @param nids The cards to be searched for.
-     * @param src The original text to find.
-     * @param dst The text to change to.
-     * @param regex If true, the src is treated as a regex. Default = false.
-     * @return Number of notes with fields that were updated.
-     */
+
     public static int findReplace(Collection col, List<Long> nids, String src, String dst, boolean regex) {
         return findReplace(col, nids, src, dst, regex, null, true);
     }
 
-    /**
-     * Find and replace fields in a note
-     *
-     * @param col The collection to search into.
-     * @param nids The cards to be searched for.
-     * @param src The original text to find.
-     * @param dst The text to change to.
-     * @param field Limit the search to specific field. If null, it searches all fields.
-     * @return Number of notes with fields that were updated.
-     */
+
     public static int findReplace(Collection col, List<Long> nids, String src, String dst, String field) {
         return findReplace(col, nids, src, dst, false, field, true);
     }
 
-    /**
-     * Find and replace fields in a note
-     *
-     * @param col The collection to search into.
-     * @param nids The cards to be searched for.
-     * @param src The original text to find.
-     * @param dst The text to change to.
-     * @param isRegex If true, the src is treated as a regex. Default = false.
-     * @param field Limit the search to specific field. If null, it searches all fields.
-     * @param fold If true the search is case-insensitive. Default = true.
-     * @return Number of notes with fields that were updated. */
+
     public static int findReplace(Collection col, List<Long> nids, String src, String dst, boolean isRegex,
             String field, boolean fold) {
         Map<Long, Integer> mmap = new HashMap<>();
         if (field != null) {
-            for (JSONObject m : col.getModels().all()) {
-                JSONArray flds = m.getJSONArray("flds");
-                for (int fi = 0; fi < flds.length(); ++fi) {
-                    JSONObject f = flds.getJSONObject(fi);
-                    if (f.getString("name").equalsIgnoreCase(field)) {
-                        mmap.put(m.getLong("id"), f.getInt("ord"));
+            try {
+                for (JSONObject m : col.getModels().all()) {
+                    JSONArray flds = m.getJSONArray("flds");
+                    for (int fi = 0; fi < flds.length(); ++fi) {
+                        JSONObject f = flds.getJSONObject(fi);
+                        if (f.getString("name").equals(field)) {
+                            mmap.put(m.getLong("id"), f.getInt("ord"));
+                        }
                     }
                 }
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
             }
             if (mmap.isEmpty()) {
                 return 0;
@@ -868,7 +844,6 @@ public class Finder {
         // find and gather replacements
         if (!isRegex) {
             src = Pattern.quote(src);
-            dst = dst.replace("\\", "\\\\");
         }
         if (fold) {
             src = "(?i)" + src;
@@ -878,8 +853,10 @@ public class Finder {
         ArrayList<Object[]> d = new ArrayList<>();
         String snids = Utils.ids2str(nids);
         nids = new ArrayList<>();
-        try (Cursor cur = col.getDb().getDatabase().query(
-                "select id, mid, flds from notes where id in " + snids, null)) {
+        Cursor cur = null;
+        try {
+            cur = col.getDb().getDatabase().rawQuery(
+                    "select id, mid, flds from notes where id in " + snids, null);
             while (cur.moveToNext()) {
                 String flds = cur.getString(2);
                 String origFlds = flds;
@@ -902,8 +879,12 @@ public class Finder {
                 if (!flds.equals(origFlds)) {
                     long nid = cur.getLong(0);
                     nids.add(nid);
-                    d.add(new Object[] { flds, Utils.intTime(), col.usn(), nid }); // order based on query below
+                    d.add(new Object[] { flds, Utils.intNow(), col.usn(), nid }); // order based on query below
                 }
+            }
+        } finally {
+            if (cur != null) {
+                cur.close();
             }
         }
         if (d.isEmpty()) {
@@ -925,15 +906,19 @@ public class Finder {
     public List<String> fieldNames(Collection col, boolean downcase) {
         Set<String> fields = new HashSet<>();
         List<String> names = new ArrayList<>();
-        for (JSONObject m : col.getModels().all()) {
-            JSONArray flds = m.getJSONArray("flds");
-            for (int fi = 0; fi < flds.length(); ++fi) {
-                JSONObject f = flds.getJSONObject(fi);
-                if (!fields.contains(f.getString("name").toLowerCase(Locale.US))) {
-                    names.add(f.getString("name"));
-                    fields.add(f.getString("name").toLowerCase(Locale.US));
+        try {
+            for (JSONObject m : col.getModels().all()) {
+                JSONArray flds = m.getJSONArray("flds");
+                for (int fi = 0; fi < flds.length(); ++fi) {
+                    JSONObject f = flds.getJSONObject(fi);
+                    if (!fields.contains(f.getString("name").toLowerCase(Locale.US))) {
+                        names.add(f.getString("name"));
+                        fields.add(f.getString("name").toLowerCase(Locale.US));
+                    }
                 }
             }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
         if (downcase) {
             return new ArrayList<>(fields);
@@ -950,13 +935,17 @@ public class Finder {
     public static Integer ordForMid(Collection col, Map<Long, Integer> fields, long mid, String fieldName) {
         if (!fields.containsKey(mid)) {
             JSONObject model = col.getModels().get(mid);
-            JSONArray flds = model.getJSONArray("flds");
-            for (int c = 0; c < flds.length(); c++) {
-                JSONObject f = flds.getJSONObject(c);
-                if (f.getString("name").equalsIgnoreCase(fieldName)) {
-                    fields.put(mid, c);
-                    break;
+            try {
+                JSONArray flds = model.getJSONArray("flds");
+                for (int c = 0; c < flds.length(); c++) {
+                    JSONObject f = flds.getJSONObject(c);
+                    if (f.getString("name").equalsIgnoreCase(fieldName)) {
+                        fields.put(mid, c);
+                        break;
+                    }
                 }
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
             }
         }
         return fields.get(mid);
@@ -981,8 +970,10 @@ public class Finder {
         Map<String, List<Long>> vals = new HashMap<>();
         List<Pair<String, List<Long>>> dupes = new ArrayList<>();
         Map<Long, Integer> fields = new HashMap<>();
-        try (Cursor cur = col.getDb().getDatabase().query(
-                "select id, mid, flds from notes where id in " + Utils.ids2str(col.findNotes(search)), null)) {
+        Cursor cur = null;
+        try {
+            cur = col.getDb().getDatabase().rawQuery(
+                    "select id, mid, flds from notes where id in " + Utils.ids2str(col.findNotes(search)), null);
             while (cur.moveToNext()) {
                 long nid = cur.getLong(0);
                 long mid = cur.getLong(1);
@@ -1005,7 +996,97 @@ public class Finder {
                     dupes.add(new Pair<>(val, vals.get(val)));
                 }
             }
+        } finally {
+            if (cur != null) {
+                cur.close();
+            }
         }
         return dupes;
+    }
+
+    /*
+     * ***********************************************************
+     * The methods below are not in LibAnki.
+     * ***********************************************************
+     */
+
+    public List<Map<String, String>> findCardsForCardBrowser(String query, boolean _order, Map<String, String> deckNames) {
+        return _findCardsForCardBrowser(query, _order, deckNames);
+    }
+
+
+    public List<Map<String, String>> findCardsForCardBrowser(String query, String _order, Map<String, String> deckNames) {
+        return _findCardsForCardBrowser(query, _order, deckNames);
+    }
+
+
+    /** Return a list of card ids for QUERY */
+    private List<Map<String, String>> _findCardsForCardBrowser(String query, Object _order, Map<String, String> deckNames) {
+        String[] tokens = _tokenize(query);
+        Pair<String, String[]> res1 = _where(tokens);
+        String preds = res1.first;
+        String[] args = res1.second;
+        List<Map<String, String>> res = new ArrayList<>();
+        if (preds == null) {
+            return res;
+        }
+        Pair<String, Boolean> res2 = _order instanceof Boolean ? _order((Boolean) _order) : _order((String) _order);
+        String order = res2.first;
+        boolean rev = res2.second;
+        String sql = _queryForCardBrowser(preds, order);
+        Cursor cur = null;
+        try {
+            cur = mCol.getDb().getDatabase().rawQuery(sql, args);
+            DeckTask task = DeckTask.getInstance();
+            while (cur.moveToNext()) {
+                // cancel if the launching task was cancelled. 
+                if (task.isCancelled()){
+                    Timber.i("_findCardsForCardBrowser() cancelled...");
+                    return null;
+                }                
+                Map<String, String> map = new HashMap<>();
+                map.put("id", cur.getString(0));
+                map.put("sfld", cur.getString(1));
+                map.put("deck", deckNames.get(cur.getString(2)));
+                int queue = cur.getInt(3);
+                String tags = cur.getString(4);
+                map.put("flags", Integer.toString((queue == -1 ? 1 : 0) + (tags.matches(".*[Mm]arked.*") ? 2 : 0)));
+                map.put("tags", tags);
+                res.add(map);
+                // add placeholder for question and answer
+                map.put("question", "");
+                map.put("answer", "");
+            }
+        } catch (SQLException e) {
+            // invalid grouping
+            Timber.e("Invalid grouping, sql: " + sql);
+            return new ArrayList<>();
+        } finally {
+            if (cur != null) {
+                cur.close();
+            }
+        }
+        if (rev) {
+            Collections.reverse(res);
+        }
+        return res;
+    }
+    
+    /**
+     * A copy of _query() with a custom SQL query specific to the AnkiDroid card browser.
+     */
+    private String _queryForCardBrowser(String preds, String order) {
+        String sql = "select c.id, n.sfld, c.did, c.queue, n.tags from cards c, notes n where c.nid=n.id and ";
+        // combine with preds
+        if (!TextUtils.isEmpty(preds)) {
+            sql += "(" + preds + ")";
+        } else {
+            sql += "1";
+        }
+        // order
+        if (!TextUtils.isEmpty(order)) {
+            sql += " " + order;
+        }
+        return sql;
     }
 }

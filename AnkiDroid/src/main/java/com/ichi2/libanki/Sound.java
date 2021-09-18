@@ -17,15 +17,16 @@
 
 package com.ichi2.libanki;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
-import android.graphics.Point;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer.OnCompletionListener;
 import android.media.ThumbnailUtils;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.MediaStore;
 
 import android.view.Display;
@@ -36,23 +37,21 @@ import android.widget.VideoView;
 import com.ichi2.anki.AbstractFlashcardViewer;
 import com.ichi2.anki.AnkiDroidApp;
 import com.ichi2.anki.ReadText;
+import com.ichi2.compat.CompatHelper;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import androidx.annotation.Nullable;
 import timber.log.Timber;
 
-
-//NICE_TO_HAVE: Abstract, then add tests fir #6111
 /**
  * Class used to parse, load and play sound files on AnkiDroid.
  */
-@SuppressWarnings({"PMD.NPathComplexity","PMD.CollapsibleIfStatements"})
 public class Sound {
 
     /**
@@ -106,13 +105,23 @@ public class Sound {
     /**
      * Listener to handle audio focus. Currently blank because we're not respecting losing focus from other apps.
      */
-    private static AudioManager.OnAudioFocusChangeListener afChangeListener = focusChange -> {
+    private static AudioManager.OnAudioFocusChangeListener afChangeListener = new AudioManager.OnAudioFocusChangeListener() {
+        public void onAudioFocusChange(int focusChange) {
+        }
     };
 
 
     // Clears current sound paths; call before parseSounds() calls
     public void resetSounds() {
         mSoundPaths.clear();
+    }
+
+    /**
+     * resetSounds removes lists of sounds
+     * @param which -- One of the subset flags, such as Sound.SOUNDS_QUESTION
+     */
+    public void resetSounds(int which) {
+        mSoundPaths.remove(which);
     }
 
 
@@ -131,14 +140,13 @@ public class Sound {
         while (matcher.find()) {
             // Create appropriate list if needed; list must not be empty so long as code does no check
             if (!mSoundPaths.containsKey(qa)) {
-                mSoundPaths.put(qa, new ArrayList<>());
+                mSoundPaths.put(qa, new ArrayList<String>());
             }
 
             // Get the sound file name
             String sound = matcher.group(1).trim();
 
             // Construct the sound path and store it
-            Timber.d("Adding Sound to side: %d", qa);
             mSoundPaths.get(qa).add(getSoundPath(soundDir, sound));
         }
     }
@@ -149,7 +157,7 @@ public class Sound {
      * together, which even when configured as supported may not be instigated
      * @return True if a non-null list was created, or false otherwise
      */
-    private Boolean makeQuestionAnswerList() {
+    public Boolean makeQuestionAnswerList() {
         // if combined list already exists, don't recreate
         if (mSoundPaths.containsKey(Sound.SOUNDS_QUESTION_AND_ANSWER)) {
             return false; // combined list already exists
@@ -158,7 +166,7 @@ public class Sound {
         // make combined list only if necessary to avoid an empty combined list
         if (mSoundPaths.containsKey(Sound.SOUNDS_QUESTION) || mSoundPaths.containsKey(Sound.SOUNDS_ANSWER)) {
             // some list exists to place into combined list
-            mSoundPaths.put(Sound.SOUNDS_QUESTION_AND_ANSWER, new ArrayList<>());
+            mSoundPaths.put(Sound.SOUNDS_QUESTION_AND_ANSWER, new ArrayList<String>());
         } else { // no need to make list
             return false;
         }
@@ -201,16 +209,21 @@ public class Sound {
             // Construct the new content, appending the substring from the beginning of the content left until the
             // beginning of the sound marker
             // and then appending the html code to add the play button
-            String button = "<svg viewBox=\"0 0 32 32\"><polygon points=\"11,25 25,16 11,7\"/>Replay</svg>";
+            String button;
+            if (CompatHelper.getSdkVersion() >= Build.VERSION_CODES.HONEYCOMB) {
+                button = "<svg viewBox=\"0 0 32 32\"><polygon points=\"11,25 25,16 11,7\"/>Replay</svg>";
+            } else {
+                button = "<img src='file:///android_asset/inline_play_button.png' />";
+            }
             String soundMarker = matcher.group();
             int markerStart = contentLeft.indexOf(soundMarker);
             stringBuilder.append(contentLeft.substring(0, markerStart));
             // The <span> around the button (SVG or PNG image) is needed to make the vertical alignment work.
-            stringBuilder.append("<a class='replaybutton' href=\"playsound:").append(soundPath).append("\">")
-                    .append("<span>").append(button)
-                    .append("</span></a>");
+            stringBuilder.append("<a class='replaybutton' href=\"playsound:" + soundPath + "\">"
+                    + "<span>"+ button
+                    + "</span></a>");
             contentLeft = contentLeft.substring(markerStart + soundMarker.length());
-            Timber.v("Content left = %s", contentLeft);
+            Timber.d("Content left = %s", contentLeft);
         }
 
         // unused code related to tts support taken out after v2.2alpha55
@@ -229,14 +242,10 @@ public class Sound {
     public void playSounds(int qa) {
         // If there are sounds to play for the current card, start with the first one
         if (mSoundPaths != null && mSoundPaths.containsKey(qa)) {
-            Timber.d("playSounds %d", qa);
-            playSoundInternal(mSoundPaths.get(qa).get(0), new PlayAllCompletionListener(qa), null);
+            playSound(mSoundPaths.get(qa).get(0), new PlayAllCompletionListener(qa));
         } else if (mSoundPaths != null && qa == Sound.SOUNDS_QUESTION_AND_ANSWER) {
             if (makeQuestionAnswerList()) {
-                Timber.d("playSounds: playing both question and answer");
-                playSoundInternal(mSoundPaths.get(qa).get(0), new PlayAllCompletionListener(qa), null);
-            } else {
-                Timber.d("playSounds: No question answer list, not playing sound");
+                playSound(mSoundPaths.get(qa).get(0), new PlayAllCompletionListener(qa));
             }
         }
     }
@@ -254,8 +263,8 @@ public class Sound {
                 try {
                     metaRetriever.setDataSource(AnkiDroidApp.getInstance().getApplicationContext(), soundUri);
                     length += Long.parseLong(metaRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
-                } catch (Exception e) {
-                    Timber.e(e, "metaRetriever - Error setting Data Source for mediaRetriever (media doesn't exist or forbidden?).");
+                } catch (IllegalArgumentException iae) {
+                    Timber.e(iae, "metaRetriever - Error setting Data Source for mediaRetriever (media doesn't exist).");
                 }
             }
         }
@@ -264,6 +273,8 @@ public class Sound {
 
     /**
      * Plays the given sound or video and sets playAllListener if available on media player to start next media
+     * @param soundPath
+     * @param playAllListener
      */
     public void playSound(String soundPath, OnCompletionListener playAllListener) {
         playSound(soundPath, playAllListener, null);
@@ -272,20 +283,16 @@ public class Sound {
     /**
      * Plays the given sound or video and sets playAllListener if available on media player to start next media.
      * If videoView is null and the media is a video, then a request is sent to start the VideoPlayer Activity
+     * @param soundPath
+     * @param playAllListener
+     * @param videoView
      */
+    @SuppressLint("NewApi")
     public void playSound(String soundPath, OnCompletionListener playAllListener, final VideoView videoView) {
-        Timber.d("Playing single sound");
-        SingleSoundCompletionListener completionListener = new SingleSoundCompletionListener(playAllListener);
-        playSoundInternal(soundPath, completionListener, videoView);
-    }
-
-    /** Plays a sound without ensuring that the playAllListener will release the audio */
-    @SuppressWarnings({"PMD.EmptyIfStmt","PMD.CollapsibleIfStatements","deprecation"}) // audio API deprecation tracked on github as #5022
-    private void playSoundInternal(String soundPath, OnCompletionListener playAllListener, VideoView videoView) {
         Timber.d("Playing %s has listener? %b", soundPath, playAllListener != null);
         Uri soundUri = Uri.parse(soundPath);
 
-        if ("tts".equals(soundPath.substring(0, 3))) {
+        if (soundPath.substring(0, 3).equals("tts")) {
             // TODO: give information about did
 //            ReadText.textToSpeech(soundPath.substring(4, soundPath.length()),
 //                    Integer.parseInt(soundPath.substring(3, 4)));
@@ -295,7 +302,7 @@ public class Sound {
             boolean isVideo = Arrays.asList(VIDEO_WHITELIST).contains(extension);
             if (!isVideo) {
                 final String guessedType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
-                isVideo = (guessedType != null) && guessedType.startsWith("video/");
+                isVideo = isVideo || (guessedType != null && guessedType.startsWith("video/"));
             }
             // Also check that there is a video thumbnail, as some formats like mp4 can be audio only
             isVideo = isVideo &&
@@ -304,7 +311,6 @@ public class Sound {
             // If video file but no SurfaceHolder provided then ask AbstractFlashcardViewer to provide a VideoView
             // holder
             if (isVideo && videoView == null && mCallingActivity != null && mCallingActivity.get() != null) {
-                Timber.d("Requesting AbstractFlashcardViewer play video - no SurfaceHolder");
                 mPlayAllListener = playAllListener;
                 ((AbstractFlashcardViewer) mCallingActivity.get()).playVideo(soundPath);
                 return;
@@ -313,10 +319,8 @@ public class Sound {
             try {
                 // Create media player
                 if (mMediaPlayer == null) {
-                    Timber.d("Creating media player for playback");
                     mMediaPlayer = new MediaPlayer();
                 } else {
-                    Timber.d("Resetting media for playback");
                     mMediaPlayer.reset();
                 }
                 if (mAudioManager == null) {
@@ -325,24 +329,26 @@ public class Sound {
                 // Provide a VideoView to the MediaPlayer if valid video file
                 if (isVideo && videoView != null) {
                     mMediaPlayer.setDisplay(videoView.getHolder());
-                    mMediaPlayer.setOnVideoSizeChangedListener((mp, width, height) -> configureVideo(videoView, width, height));
+                    mMediaPlayer.setOnVideoSizeChangedListener(new MediaPlayer.OnVideoSizeChangedListener() {
+                        @Override
+                        public void onVideoSizeChanged(MediaPlayer mp, int width, int height) {
+                            configureVideo(videoView, width, height);
+                        }
+                    });
                 }
-                mMediaPlayer.setOnErrorListener((mp, what, extra) -> {
-                    Timber.w("Media Error: (%d, %d). Calling OnCompletionListener", what, extra);
-                    return false;
-                });
                 // Setup the MediaPlayer
                 mMediaPlayer.setDataSource(AnkiDroidApp.getInstance().getApplicationContext(), soundUri);
                 mMediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
-                mMediaPlayer.setOnPreparedListener(mp -> {
-                    Timber.d("Starting media player");
-                    mMediaPlayer.start();
+                mMediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                    @Override
+                    public void onPrepared(MediaPlayer mp) {
+                        mMediaPlayer.start();
+                    }
                 });
                 if (playAllListener != null) {
                     mMediaPlayer.setOnCompletionListener(playAllListener);
                 }
                 mMediaPlayer.prepareAsync();
-                Timber.d("Requesting audio focus");
                 mAudioManager.requestAudioFocus(afChangeListener, AudioManager.STREAM_MUSIC,
                         AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
             } catch (Exception e) {
@@ -359,10 +365,8 @@ public class Sound {
         Display display = wm.getDefaultDisplay();
         // adjust the size of the video so it fits on the screen
         float videoProportion = (float) videoWidth / (float) videoHeight;
-        Point point = new Point();
-        display.getSize(point);
-        int screenWidth = point.x;
-        int screenHeight = point.y;
+        int screenWidth = display.getWidth();
+        int screenHeight = display.getHeight();
         float screenProportion = (float) screenWidth / (float) screenHeight;
         android.view.ViewGroup.LayoutParams lp = videoView.getLayoutParams();
 
@@ -379,26 +383,6 @@ public class Sound {
     public void notifyConfigurationChanged(VideoView videoView) {
         if (mMediaPlayer != null) {
             configureVideo(videoView, mMediaPlayer.getVideoWidth(), mMediaPlayer.getVideoHeight());
-        }
-    }
-
-    /** #5414 - Ensures playing a single sound performs cleanup */
-    private final class SingleSoundCompletionListener implements OnCompletionListener {
-        @Nullable
-        private final OnCompletionListener userCallback;
-
-        public SingleSoundCompletionListener(@Nullable OnCompletionListener userCallback) {
-            this.userCallback = userCallback;
-        }
-
-        @Override
-        public void onCompletion(MediaPlayer mp) {
-            Timber.d("Single Sound completed");
-            if (userCallback != null) {
-                userCallback.onCompletion(mp);
-            } else {
-                releaseSound();
-            }
         }
     }
 
@@ -427,10 +411,8 @@ public class Sound {
         public void onCompletion(MediaPlayer mp) {
             // If there is still more sounds to play for the current card, play the next one
             if (mSoundPaths.containsKey(mQa) && mNextToPlay < mSoundPaths.get(mQa).size()) {
-                Timber.i("Play all: Playing next sound");
                 playSound(mSoundPaths.get(mQa).get(mNextToPlay++), this);
             } else {
-                Timber.i("Play all: Completed - releasing sound");
                 releaseSound();
             }
         }
@@ -439,13 +421,8 @@ public class Sound {
     /**
      * Releases the sound.
      */
-    @SuppressWarnings("deprecation") // Tracked on github as #5022
     private void releaseSound() {
-        Timber.d("Releasing sounds and abandoning audio focus");
         if (mMediaPlayer != null) {
-            //Required to remove warning: "mediaplayer went away with unhandled events"
-            //https://stackoverflow.com/questions/9609479/android-mediaplayer-went-away-with-unhandled-events
-            mMediaPlayer.reset();
             mMediaPlayer.release();
             mMediaPlayer = null;
         }
@@ -489,6 +466,7 @@ public class Sound {
 
     /**
      * Set the context for the calling activity (necessary for playing videos)
+     * @param activityRef
      */
     public void setContext(WeakReference<Activity> activityRef) {
         mCallingActivity = activityRef;

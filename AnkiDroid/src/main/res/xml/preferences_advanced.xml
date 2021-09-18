@@ -31,7 +31,7 @@
             android:key="deckPath"
             android:summary="@string/preference_summary_literal"
             android:title="@string/col_path" />
-        <com.ichi2.ui.ConfirmationPreference
+        <Preference
             android:key="force_full_sync"
             android:title="@string/force_full_sync_title"
             android:summary="@string/force_full_sync_summary" />
@@ -59,15 +59,29 @@
                 android:title="@string/safe_display" />
             <CheckBoxPreference
                 android:defaultValue="false"
+                android:key="writeAnswersDisable"
+                android:summary="@string/write_answers_disable_summ"
+                android:title="@string/write_answers_disable" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="inputWorkaround"
+                android:summary="@string/input_workaround_summ"
+                android:title="@string/input_workaround" />
+            <CheckBoxPreference
+                android:defaultValue="false"
                 android:key="useInputTag"
                 android:summary="@string/use_input_tag_summ"
                 android:title="@string/use_input_tag" />
-            <!-- Workaround for #5533 -->
             <CheckBoxPreference
                 android:defaultValue="false"
-                android:key="disableExtendedTextUi"
-                android:summary="@string/disable_extended_text_ui_summ"
-                android:title="@string/disable_extended_text_ui" />
+                android:key="textSelectionLongclickWorkaround"
+                android:summary="@string/text_selection_click_summ"
+                android:title="@string/text_selection_click" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="fixHebrewText"
+                android:summary="@string/fix_hebrew_text_summ"
+                android:title="@string/fix_hebrew_text" />
         </PreferenceCategory>
         <PreferenceCategory
             android:key="category_plugins"
@@ -77,11 +91,6 @@
                 android:key="providerEnabled"
                 android:summary="@string/enable_api_summary"
                 android:title="@string/enable_api_title"/>
-            <Preference
-                android:key="thirdpartyapps_link"
-                android:summary="@string/thirdparty_apps_summary"
-                android:title="@string/thirdparty_apps_title">
-            </Preference>
             <CheckBoxPreference
                 android:defaultValue="false"
                 android:key="tts"
@@ -92,6 +101,7 @@
                 android:entries="@array/dictionary_labels"
                 android:entryValues="@array/dictionary_values"
                 android:key="dictionary"
+                android:summary="@string/preference_summary_literal"
                 android:title="@string/dictionary" />
             <com.ichi2.preferences.CustomDialogPreference
                 android:dialogIcon="@drawable/ic_dialog_alert"
@@ -121,24 +131,9 @@
             <Preference
                 android:key="advanced_statistics_link"
                 android:title="@string/advanced_statistics_title"/>
-            <CheckBoxPreference
-                android:defaultValue="false"
-                android:key="html_javascript_debugging"
-                android:summary="@string/html_javascript_debugging_summ"
-                android:title="@string/html_javascript_debugging"/>
-            <!-- Title and summary are variable, handled in string:
-            card_browser_enable_external_context_menu -->
-            <CheckBoxPreference
-                android:id="@+id/card_browser_external_context_menu"
-                android:defaultValue="true"
-                android:key="card_browser_enable_external_context_menu"/>
         </PreferenceCategory>
 
 
-    <CheckBoxPreference
-        android:key="schedVer"
-        android:title="@string/sched_ver"
-        android:summary="@string/sched_ver_summ" />
     <Preference
         android:key="about_dialog_preference"
         android:title="@string/about_title">

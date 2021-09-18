@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<androidx.coordinatorlayout.widget.CoordinatorLayout
+<android.support.design.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root_layout"
     android:layout_width="fill_parent"
@@ -54,5 +54,5 @@
 
         </LinearLayout>
     </RelativeLayout>
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</android.support.design.widget.CoordinatorLayout>
 

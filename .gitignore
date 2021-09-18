@@ -38,20 +38,17 @@ Thumbs.db
 # Ubunut gedit cluter
 *~
 
-# IDEA/Android Studio ignores
-*.iml
-*.ipr
-*.iws
-/.idea/*
-/captures
+# Intellij IDEA (see https://intellij-support.jetbrains.com/entries/23393067)
+.idea/*
 
-# IDEA/Android Studio Ignore exceptions - this lets you share things you specifically want all team members to use
-!/.idea/codeStyles/
+# Additionally ignore project files themselves so developers can choose their root directory name freely
+.idea/modules.xml
+*.iml
 
 # Crowdin files
 ankidroid.zip
 tools/crowdin_key.txt
 
-# Testing / quality remnants
-AnkiDroid/ACRA-INSTALLATION
-.codacy.json
+.idea/misc.xml
+
+.idea/vcs.xml

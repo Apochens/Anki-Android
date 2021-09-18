@@ -3,7 +3,7 @@ package com.ichi2.anki.dialogs;
 
 import android.content.res.Resources;
 import android.os.Bundle;
-import androidx.fragment.app.DialogFragment;
+import android.support.v4.app.DialogFragment;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.ichi2.anki.R;
@@ -50,12 +50,21 @@ import com.ichi2.anki.R;
             Resources res = getActivity().getResources();
             String title = getArguments().getString("title");
             return new MaterialDialog.Builder(getActivity())
-                .title("".equals(title) ? res.getString(R.string.app_name) : title)
+                    .title(title.equals("") ? res.getString(R.string.app_name) : title)
                     .content(getArguments().getString("message"))
                     .positiveText(res.getString(R.string.dialog_ok))
                     .negativeText(res.getString(R.string.dialog_cancel))
-                    .onPositive((dialog, which) -> mConfirm.run())
-                    .onNegative((dialog, which) -> mCancel.run())
+                    .callback(new MaterialDialog.ButtonCallback() {
+                        @Override
+                        public void onPositive(MaterialDialog dialog) {
+                            mConfirm.run();
+                        }
+
+                        @Override
+                        public void onNegative(MaterialDialog dialog) {
+                            mCancel.run();
+                        }
+                    })
                     .show();
         }
     }

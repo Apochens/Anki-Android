@@ -26,18 +26,21 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Implementation of Audio field types
+ * Implementation of Audio field type
  */
-public abstract class AudioField extends FieldBase implements IField {
-    protected String mAudioPath;
-    protected String mName;
-    protected boolean mHasTemporaryMedia = false;
+public class AudioField extends FieldBase implements IField {
+    private static final long serialVersionUID = 5033819217738174719L;
+    private String mAudioPath;
+    private String mName;
+    private boolean mHasTemporaryMedia = false;
 
-    protected static final String PATH_REGEX = "\\[sound:(.*)\\]";
+    private static final String PATH_REGEX = "\\[sound:(.*)\\]";
 
 
     @Override
-    public abstract EFieldType getType();
+    public EFieldType getType() {
+        return EFieldType.AUDIO;
+    }
 
 
     @Override
@@ -47,7 +50,9 @@ public abstract class AudioField extends FieldBase implements IField {
 
 
     @Override
-    public abstract boolean isModified();
+    public boolean isModified() {
+        return getThisModified();
+    }
 
 
     @Override
@@ -101,32 +106,37 @@ public abstract class AudioField extends FieldBase implements IField {
 
 
     @Override
-    public abstract void setHasTemporaryMedia(boolean hasTemporaryMedia);
+    public void setHasTemporaryMedia(boolean hasTemporaryMedia) {
+        mHasTemporaryMedia = hasTemporaryMedia;
+    }
 
 
     @Override
-    public abstract boolean hasTemporaryMedia();
+    public boolean hasTemporaryMedia() {
+        return mHasTemporaryMedia;
+    }
 
 
     @Override
-    public abstract String getName();
+    public String getName() {
+        return mName;
+    }
 
 
     @Override
-    public abstract void setName(String name);
+    public void setName(String name) {
+        mName = name;
+    }
 
 
     @Override
     public String getFormattedValue() {
-        String formattedValue = "";
-        if (getAudioPath() != null) {
-            File file = new File(getAudioPath());
-            if (file.exists()) {
-                formattedValue = String.format("[sound:%s]", file.getName());
-            }
+        File file = new File(getAudioPath());
+        if (file.exists()) {
+            return String.format("[sound:%s]", file.getName());
+        } else {
+            return "";
         }
-
-        return formattedValue;
     }
 
 

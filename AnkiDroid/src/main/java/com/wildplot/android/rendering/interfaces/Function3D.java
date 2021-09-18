@@ -27,5 +27,5 @@ public interface Function3D {
 	 * @param y given y value
 	 * @return function value calculated with given x and y values
 	 */
- 	double f(double x, double y);
+	public double f(double x, double y);
 }
