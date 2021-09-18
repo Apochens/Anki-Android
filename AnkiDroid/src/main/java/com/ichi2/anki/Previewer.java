@@ -43,12 +43,6 @@ public class Previewer extends AbstractFlashcardViewer {
 
         mCardList = getIntent().getLongArrayExtra("cardList");
         mIndex = getIntent().getIntExtra("index", -1);
-
-        if (savedInstanceState != null){
-            mIndex = savedInstanceState.getInt("index", mIndex);
-            mShowingAnswer = savedInstanceState.getBoolean("showingAnswer", mShowingAnswer);
-        }
-
         if (mCardList.length == 0 || mIndex < 0 || mIndex > mCardList.length - 1) {
             Timber.e("Previewer started with empty card list or invalid index");
             finishWithoutAnimation();
@@ -64,12 +58,7 @@ public class Previewer extends AbstractFlashcardViewer {
     protected void onCollectionLoaded(Collection col) {
         super.onCollectionLoaded(col);
         mCurrentCard = col.getCard(mCardList[mIndex]);
-        if (mShowingAnswer){
-            displayCardQuestion();
-            displayCardAnswer();
-        } else {
-            displayCardQuestion();
-        }
+        displayCardQuestion();
         showBackIcon();
     }
 
@@ -84,15 +73,6 @@ public class Previewer extends AbstractFlashcardViewer {
     protected void initLayout() {
         super.initLayout();
         mTopBarLayout.setVisibility(View.GONE);
-    }
-
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        outState.putLongArray("cardList", mCardList);
-        outState.putInt("index", mIndex);
-        outState.putBoolean("showingAnswer", mShowingAnswer);
-        super.onSaveInstanceState(outState);
     }
 
 
@@ -118,11 +98,9 @@ public class Previewer extends AbstractFlashcardViewer {
     protected void updateScreenCounts() { /* do nothing */ }
 
 
+    // No Gestures!
     @Override
-    public boolean executeCommand(int which) {
-        /* do nothing */
-        return false;
-    }
+    protected void executeCommand(int which) { /* do nothing */ }
 
     private View.OnClickListener mSelectScrollHandler = new View.OnClickListener() {
         @Override
@@ -149,7 +127,7 @@ public class Previewer extends AbstractFlashcardViewer {
 
     private void updateButtonState() {
         // If we are in single-card mode, we show the "Show Answer" button on the question side
-        // and hide all the buttons on the answer side.
+        // and hide all the button s on the answer side.
         if (mCardList.length == 1) {
             if (!mShowingAnswer) {
                 mFlipCardLayout.setVisibility(View.VISIBLE);

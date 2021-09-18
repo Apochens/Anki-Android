@@ -10,13 +10,12 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.ichi2.async.CollectionTask;
-import com.ichi2.async.CollectionTask.TaskData;
+import com.ichi2.async.DeckTask;
+import com.ichi2.async.DeckTask.TaskData;
 
 import java.util.Calendar;
 
 import timber.log.Timber;
-import static com.ichi2.async.CollectionTask.TASK_TYPE.*;
 
 public class UIUtils {
 
@@ -116,9 +115,9 @@ public class UIUtils {
     }
 
 
-    public static void saveCollectionInBackground() {
+    public static void saveCollectionInBackground(Context context) {
         if (CollectionHelper.getInstance().colIsOpen()) {
-            CollectionTask.launchCollectionTask(SAVE_COLLECTION, new CollectionTask.TaskListener() {
+            DeckTask.launchDeckTask(DeckTask.TASK_TYPE_SAVE_COLLECTION, new DeckTask.TaskListener() {
                 @Override
                 public void onPreExecute() {
                     Timber.d("saveCollectionInBackground: start");

@@ -25,9 +25,9 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -35,22 +35,18 @@ import android.widget.LinearLayout;
 
 import com.ichi2.anki.AnkiActivity;
 import com.ichi2.anki.R;
-import com.ichi2.anki.UIUtils;
 import com.ichi2.anki.multimediacard.IMultimediaEditableNote;
 import com.ichi2.anki.multimediacard.fields.AudioClipField;
 import com.ichi2.anki.multimediacard.fields.AudioRecordingField;
 import com.ichi2.anki.multimediacard.fields.BasicControllerFactory;
-import com.ichi2.anki.multimediacard.fields.BasicImageFieldController;
 import com.ichi2.anki.multimediacard.fields.EFieldType;
 import com.ichi2.anki.multimediacard.fields.IControllerFactory;
 import com.ichi2.anki.multimediacard.fields.IField;
 import com.ichi2.anki.multimediacard.fields.IFieldController;
 import com.ichi2.anki.multimediacard.fields.ImageField;
 import com.ichi2.anki.multimediacard.fields.TextField;
-import com.ichi2.utils.Permissions;
 
 import java.io.File;
-import java.text.DecimalFormat;
 
 import timber.log.Timber;
 
@@ -68,30 +64,20 @@ public class MultimediaEditFieldActivity extends AnkiActivity
     private static final int REQUEST_AUDIO_PERMISSION = 0;
     private static final int REQUEST_CAMERA_PERMISSION = 1;
 
-    public static final int sImageLimit = 1024 * 1024; // 1MB in bytes
-
     private IField mField;
     private IMultimediaEditableNote mNote;
     private int mFieldIndex;
 
     private IFieldController mFieldController;
-    /**
-     * Cached copy of the current request to change a field
-     * Used to access past state from OnRequestPermissionsResultCallback
-     * */
-    private ChangeUIRequest mCurrentChangeRequest;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Bundle controllerBundle = null;
         if (savedInstanceState != null) {
-            Timber.i("onCreate - saved bundle exists");
             boolean b = savedInstanceState.getBoolean(BUNDLE_KEY_SHUT_OFF, false);
-            controllerBundle = savedInstanceState.getBundle("controllerBundle");
-            if (controllerBundle == null && b) {
-                Timber.i("onCreate - saved bundle has BUNDLE_KEY_SHUT_OFF and no controller bundle, terminating");
+            if (b) {
                 finishCancel();
                 return;
             }
@@ -99,99 +85,59 @@ public class MultimediaEditFieldActivity extends AnkiActivity
 
         setContentView(R.layout.multimedia_edit_field_activity);
         View mainView = findViewById(android.R.id.content);
-        enableToolbar(mainView);
-
-        Intent intent = this.getIntent();
-        mField = getFieldFromIntent(intent);
-
-        mNote = (IMultimediaEditableNote) intent.getSerializableExtra(EXTRA_WHOLE_NOTE);
-
-        mFieldIndex = intent.getIntExtra(EXTRA_FIELD_INDEX, 0);
-
-        if (mField == null) {
-            UIUtils.showThemedToast(this, getString(R.string.multimedia_editor_failed), false);
-            finishCancel();
-            return;
+        Toolbar toolbar = mainView.findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
         }
 
-        recreateEditingUi(ChangeUIRequest.init(mField), controllerBundle);
-    }
+        mField = (IField) this.getIntent().getExtras().getSerializable(EXTRA_FIELD);
 
-    @VisibleForTesting
-    public static IField getFieldFromIntent(Intent intent) {
-        return (IField) intent.getExtras().getSerializable(EXTRA_FIELD);
+        mNote = (IMultimediaEditableNote) this.getIntent().getSerializableExtra(EXTRA_WHOLE_NOTE);
+
+        mFieldIndex = this.getIntent().getIntExtra(EXTRA_FIELD_INDEX, 0);
+
+        recreateEditingUi();
     }
 
 
     private void finishCancel() {
-        Timber.d("Completing activity via finishCancel()");
         Intent resultData = new Intent();
         setResult(RESULT_CANCELED, resultData);
         finishWithoutAnimation();
     }
 
-    private boolean performPermissionRequest(IField field) {
-        // Request permission to record if audio field
-        if (field instanceof AudioRecordingField && !Permissions.canRecordAudio(this)) {
-            Timber.d("Requesting Audio Permissions");
-            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.RECORD_AUDIO},
-                    REQUEST_AUDIO_PERMISSION);
-            return true;
-        }
 
-        // Request permission to use the camera if image field
-        if (field instanceof ImageField && !Permissions.canUseCamera(this)) {
-            Timber.d("Requesting Camera Permissions");
-            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.CAMERA},
-                    REQUEST_CAMERA_PERMISSION);
-            return true;
-        }
-
-        return false;
-    }
-
-    /** Sets various properties required for IFieldController to be in a valid state */
-    private void setupUIController(IFieldController fieldController, @Nullable Bundle savedInstanceState) {
-        fieldController.setField(mField);
-        fieldController.setFieldIndex(mFieldIndex);
-        fieldController.setNote(mNote);
-        fieldController.setEditingActivity(this);
-        fieldController.loadInstanceState(savedInstanceState);
-    }
-
-    private void recreateEditingUi(ChangeUIRequest newUI) {
-        this.recreateEditingUi(newUI, null);
-    }
-
-    private void recreateEditingUi(ChangeUIRequest newUI, @Nullable Bundle savedInstanceState) {
+    private void recreateEditingUi() {
         Timber.d("recreateEditingUi()");
-
-        //Permissions are checked async, save our current state to allow continuation
-        mCurrentChangeRequest = newUI;
-
-        //If we went through the permission check once, we don't need to do it again.
-        //As we only get here a second time if we have the required permissions
-        if (newUI.getRequiresPermissionCheck() && performPermissionRequest(newUI.getField())) {
-            newUI.markAsPermissionRequested();
-            return;
-        }
 
         IControllerFactory controllerFactory = BasicControllerFactory.getInstance();
 
-        IFieldController fieldController = controllerFactory.createControllerForField(newUI.getField());
+        mFieldController = controllerFactory.createControllerForField(mField);
 
-        if (fieldController == null) {
-            Timber.w("Field controller creation failed");
-            UIRecreationHandler.onControllerCreationFailed(newUI, this);
+        if (mFieldController == null) {
+            Timber.d("Field controller creation failed");
             return;
         }
 
-        UIRecreationHandler.onPreFieldControllerReplacement(mFieldController);
+        // Request permission to record if audio field
+        if (mField instanceof AudioRecordingField && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
+                PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO},
+                    REQUEST_AUDIO_PERMISSION);
+            return;
+        }
 
-        mFieldController = fieldController;
-        mField = newUI.getField();
-
-        setupUIController(mFieldController, savedInstanceState);
+        // Request permission to use the camera if image field
+        if (mField instanceof ImageField && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) !=
+                PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA},
+                    REQUEST_CAMERA_PERMISSION);
+            return;
+        }
+        mFieldController.setField(mField);
+        mFieldController.setFieldIndex(mFieldIndex);
+        mFieldController.setNote(mNote);
+        mFieldController.setEditingActivity(this);
 
         LinearLayout linearLayout = findViewById(R.id.LinearLayoutInScrollViewFieldEdit);
 
@@ -199,7 +145,6 @@ public class MultimediaEditFieldActivity extends AnkiActivity
 
         mFieldController.createUI(this, linearLayout);
 
-        UIRecreationHandler.onPostUICreation(newUI, this);
     }
 
 
@@ -221,22 +166,30 @@ public class MultimediaEditFieldActivity extends AnkiActivity
         switch (item.getItemId()) {
             case R.id.multimedia_edit_field_to_text:
                 Timber.i("To text field button pressed");
+                mFieldController.onFocusLost();
                 toTextField();
+                supportInvalidateOptionsMenu();
                 return true;
 
             case R.id.multimedia_edit_field_to_image:
                 Timber.i("To image button pressed");
+                mFieldController.onFocusLost();
                 toImageField();
+                supportInvalidateOptionsMenu();
                 return true;
 
             case R.id.multimedia_edit_field_to_audio:
                 Timber.i("To audio recording button pressed");
+                mFieldController.onFocusLost();
                 toAudioRecordingField();
+                supportInvalidateOptionsMenu();
                 return true;
 
             case R.id.multimedia_edit_field_to_audio_clip:
                 Timber.i("To audio clip button pressed");
+                mFieldController.onFocusLost();
                 toAudioClipField();
+                supportInvalidateOptionsMenu();
                 return true;
 
             case R.id.multimedia_edit_field_done:
@@ -251,7 +204,10 @@ public class MultimediaEditFieldActivity extends AnkiActivity
 
 
     protected void done() {
+
         mFieldController.onDone();
+
+        Intent resultData = new Intent();
 
         boolean bChangeToText = false;
 
@@ -264,12 +220,6 @@ public class MultimediaEditFieldActivity extends AnkiActivity
                 File f = new File(mField.getImagePath());
                 if (!f.exists()) {
                     bChangeToText = true;
-                } else {
-                    long length = f.length();
-                    if (length > sImageLimit) {
-                        showLargeFileCropDialog((float) (1.0 * length / sImageLimit));
-                        return;
-                    }
                 }
             }
         } else if (mField.getType() == EFieldType.AUDIO_RECORDING) {
@@ -288,29 +238,35 @@ public class MultimediaEditFieldActivity extends AnkiActivity
         if (bChangeToText) {
             mField = new TextField();
         }
-        saveAndExit();
+
+        resultData.putExtra(EXTRA_RESULT_FIELD, mField);
+        resultData.putExtra(EXTRA_RESULT_FIELD_INDEX, mFieldIndex);
+
+        setResult(RESULT_OK, resultData);
+
+        finishWithoutAnimation();
     }
 
 
     protected void toAudioRecordingField() {
         if (mField.getType() != EFieldType.AUDIO_RECORDING) {
-            ChangeUIRequest request = ChangeUIRequest.uiChange(new AudioRecordingField());
-            recreateEditingUi(request);
+            mField = new AudioRecordingField();
+            recreateEditingUi();
         }
     }
 
     protected void toAudioClipField() {
         if (mField.getType() != EFieldType.AUDIO_CLIP) {
-            ChangeUIRequest request = ChangeUIRequest.uiChange(new AudioClipField());
-            recreateEditingUi(request);
+            mField = new AudioClipField();
+            recreateEditingUi();
         }
     }
 
 
     protected void toImageField() {
         if (mField.getType() != EFieldType.IMAGE) {
-            ChangeUIRequest request = ChangeUIRequest.uiChange(new ImageField());
-            recreateEditingUi(request);
+            mField = new ImageField();
+            recreateEditingUi();
         }
 
     }
@@ -318,8 +274,8 @@ public class MultimediaEditFieldActivity extends AnkiActivity
 
     protected void toTextField() {
         if (mField.getType() != EFieldType.TEXT) {
-            ChangeUIRequest request = ChangeUIRequest.uiChange(new TextField());
-            recreateEditingUi(request);
+            mField = new TextField();
+            recreateEditingUi();
         }
     }
 
@@ -336,226 +292,38 @@ public class MultimediaEditFieldActivity extends AnkiActivity
     }
 
 
-    private void recreateEditingUIUsingCachedRequest() {
-        Timber.d("recreateEditingUIUsingCachedRequest()");
-        if (mCurrentChangeRequest == null) {
-            cancelActivityWithAssertionFailure("mCurrentChangeRequest should be set before using cached request");
-            return;
-        }
-        recreateEditingUi(mCurrentChangeRequest);
-    }
-
     public void onRequestPermissionsResult (int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if (mCurrentChangeRequest == null) {
-            cancelActivityWithAssertionFailure("mCurrentChangeRequest should be set before requesting permissions");
-            return;
-        }
-
-        Timber.d("onRequestPermissionsResult. Code: %d", requestCode);
         if (requestCode == REQUEST_AUDIO_PERMISSION && permissions.length == 1) {
-
-            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                recreateEditingUIUsingCachedRequest();
-                return;
-            }
-
-            UIUtils.showThemedToast(this,
-                    getResources().getString(R.string.multimedia_editor_audio_permission_refused),
-                    true);
-
-            UIRecreationHandler.onRequiredPermissionDenied(mCurrentChangeRequest, this);
-
+            // TODO:  Disable the record button / show some feedback to the user
+            recreateEditingUi();
         }
         if (requestCode == REQUEST_CAMERA_PERMISSION && permissions.length == 1) {
-            if (grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                UIUtils.showThemedToast(this,
-                        getResources().getString(R.string.multimedia_editor_camera_permission_refused),
-                        true);
-            }
-
             // We check permissions to set visibility on the camera button, just recreate
-            recreateEditingUIUsingCachedRequest();
+            recreateEditingUi();
         }
     }
 
-
-    private void cancelActivityWithAssertionFailure(String logMessage) {
-        Timber.e(logMessage);
-        UIUtils.showThemedToast(this, getString(R.string.mutimedia_editor_assertion_failed), false);
-        finishCancel();
-    }
-
-
     public void handleFieldChanged(IField newField) {
-        recreateEditingUi(ChangeUIRequest.fieldChange(newField));
+        mField = newField;
+        recreateEditingUi();
     }
 
-    public void showLargeFileCropDialog(float length) {
-        BasicImageFieldController imageFieldController = (BasicImageFieldController) mFieldController;
-        DecimalFormat decimalFormat = new DecimalFormat(".00");
-        String size = decimalFormat.format(length);
-        String content = getString(R.string.save_dialog_content, size);
-        imageFieldController.showCropDialog(content, (dialog, which) -> saveAndExit());
-    }
-
-
-    private void saveAndExit() {
-        Intent resultData = new Intent();
-        resultData.putExtra(EXTRA_RESULT_FIELD, mField);
-        resultData.putExtra(EXTRA_RESULT_FIELD_INDEX, mFieldIndex);
-        setResult(RESULT_OK, resultData);
-        finishWithoutAnimation();
-    }
 
     @Override
     protected void onDestroy() {
+        super.onDestroy();
+
         if (mFieldController != null) {
             mFieldController.onDestroy();
         }
-        super.onDestroy();
+
     }
 
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        Timber.d("onSaveInstanceState - saving state");
-
-        // This is used to tell the whole activity to shut down if it is restored from Activity restart.
-        // Why? I am not really sure. Perhaps to avoid terrible bugs due to not implementing things correctly?
-        outState.putBoolean(BUNDLE_KEY_SHUT_OFF, true);
-
-        // We will give field controllers a chance to save / restore across restarts though.
-        // If this bundle is not null, on restore, we should continue across Activity restart.
-        if (mFieldController != null) {
-            Bundle controllerBundle = mFieldController.saveInstanceState();
-            if (controllerBundle != null) {
-                outState.putBundle("controllerBundle", mFieldController.saveInstanceState());
-            }
-        }
         super.onSaveInstanceState(outState);
+        outState.putBoolean(BUNDLE_KEY_SHUT_OFF, true);
     }
 
-    /** Intermediate class to hold state for the onRequestPermissionsResult callback */
-    private final static class ChangeUIRequest {
-        private final IField newField;
-        private final int state;
-        private boolean mRequiresPermissionCheck = true;
-
-        /** Initial request when activity is created */
-        public static final int ACTIVITY_LOAD = 0;
-        /** A change in UI via the menu options. Cancellable */
-        public static final int UI_CHANGE = 1;
-        /** A change in UI via access to the activity. Not (yet) cancellable */
-        public static final int EXTERNAL_FIELD_CHANGE = 2;
-
-        private ChangeUIRequest(IField field, int state) {
-            this.newField = field;
-            this.state = state;
-        }
-
-        private IField getField() {
-            return newField;
-        }
-
-        private static ChangeUIRequest init(@NonNull IField field) {
-            return new ChangeUIRequest(field, ACTIVITY_LOAD);
-        }
-
-        private static ChangeUIRequest uiChange(IField field) {
-            return new ChangeUIRequest(field, UI_CHANGE);
-        }
-
-        private static ChangeUIRequest fieldChange(IField field) {
-            return new ChangeUIRequest(field, EXTERNAL_FIELD_CHANGE);
-        }
-
-        private boolean getRequiresPermissionCheck() {
-            return mRequiresPermissionCheck;
-        }
-
-        private void markAsPermissionRequested() {
-            mRequiresPermissionCheck = false;
-        }
-
-        private int getState() {
-            return state;
-        }
-    }
-
-    /**
-     * Class to contain logic relating to decisions made when recreating a UI.
-     * Can later be converted to a non-static class to allow testing of the logic.
-     * */
-    private static final class UIRecreationHandler {
-
-        /** Raised just before the field controller is replaced */
-        private static void onPreFieldControllerReplacement(IFieldController previousFieldController) {
-            Timber.d("onPreFieldControllerReplacement");
-            //on init, we don't need to do anything
-            if (previousFieldController == null) {
-                return;
-            }
-
-            //Otherwise, clean up the previous screen.
-            previousFieldController.onFocusLost();
-        }
-
-        /**
-         * Raised when we were supplied with a field that could not generate a UI controller
-         * Currently: We used a field for which we didn't know how to generate the UI
-         * */
-        private static void onControllerCreationFailed(ChangeUIRequest request, MultimediaEditFieldActivity activity) {
-            Timber.d("onControllerCreationFailed. State: %d", request.getState());
-            switch (request.getState()) {
-                case ChangeUIRequest.ACTIVITY_LOAD:
-                case ChangeUIRequest.EXTERNAL_FIELD_CHANGE:
-                    //TODO: (Optional) change in functionality. Previously we'd be left with a menu, but no UI.
-                    activity.finishCancel();
-                    break;
-                case ChangeUIRequest.UI_CHANGE:
-                    break;
-                default:
-                    Timber.e("onControllerCreationFailed: Unhandled state: %s", request.getState());
-                    break;
-            }
-        }
-
-        private static void onPostUICreation(ChangeUIRequest request, MultimediaEditFieldActivity activity) {
-            Timber.d("onPostUICreation. State: %d", request.getState());
-            switch (request.getState()) {
-                case ChangeUIRequest.UI_CHANGE:
-                case ChangeUIRequest.EXTERNAL_FIELD_CHANGE:
-                    activity.supportInvalidateOptionsMenu();
-                    break;
-                case ChangeUIRequest.ACTIVITY_LOAD:
-                    break;
-                default:
-                    Timber.e("onPostUICreation: Unhandled state: %s", request.getState());
-                    break;
-            }
-        }
-
-        private static void onRequiredPermissionDenied(ChangeUIRequest request, MultimediaEditFieldActivity activity) {
-            Timber.d("onRequiredPermissionDenied. State: %d", request.getState());
-            switch (request.state) {
-                case ChangeUIRequest.ACTIVITY_LOAD:
-                    activity.finishCancel();
-                    break;
-                case ChangeUIRequest.UI_CHANGE:
-                    return;
-                case ChangeUIRequest.EXTERNAL_FIELD_CHANGE:
-                    activity.recreateEditingUIUsingCachedRequest();
-                    break;
-                default:
-                    Timber.e("onRequiredPermissionDenied: Unhandled state: %s", request.getState());
-                    activity.finishCancel();
-                    break;
-            }
-        }
-    }
-
-    @VisibleForTesting
-    IFieldController getFieldController() {
-        return mFieldController;
-    }
 }

@@ -22,32 +22,23 @@ import android.annotation.SuppressLint;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-import android.os.Build;
 import android.os.Environment;
-import android.os.LocaleList;
 import android.preference.PreferenceManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-
 import android.util.Log;
 import android.view.ViewConfiguration;
 import android.webkit.CookieManager;
 
 import com.ichi2.anki.analytics.AnkiDroidCrashReportDialog;
-import com.ichi2.anki.contextmenu.CardBrowserContextMenu;
-import com.ichi2.anki.exception.ManuallyReportedException;
 import com.ichi2.anki.exception.StorageAccessException;
 import com.ichi2.anki.services.BootService;
-import com.ichi2.anki.services.NotificationService;
 import com.ichi2.compat.CompatHelper;
 import com.ichi2.utils.LanguageUtil;
 import com.ichi2.anki.analytics.UsageAnalytics;
-import com.ichi2.utils.Permissions;
 
 import org.acra.ACRA;
 import org.acra.ReportField;
@@ -61,12 +52,10 @@ import org.acra.config.DialogConfigurationBuilder;
 import org.acra.config.ToastConfigurationBuilder;
 import org.acra.sender.HttpSender;
 
-import java.io.InputStream;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import androidx.multidex.MultiDexApplication;
 import timber.log.Timber;
 import static timber.log.Timber.DebugTree;
 
@@ -139,7 +128,7 @@ import static timber.log.Timber.DebugTree;
         exceptionClassLimit = 1000,
         stacktraceLimit = 1
 )
-public class AnkiDroidApp extends MultiDexApplication {
+public class AnkiDroidApp extends Application {
 
     public static final String XML_CUSTOM_NAMESPACE = "http://arbitrary.app.namespace/com.ichi2.anki";
 
@@ -164,7 +153,7 @@ public class AnkiDroidApp extends MultiDexApplication {
      * collections being upgraded to (or after) this version must run an integrity check as it will contain fixes that
      * all collections should have.
      */
-    public static final int CHECK_DB_AT_VERSION = 21000172;
+    public static final int CHECK_DB_AT_VERSION = 20900148;
 
     /**
      * The latest package version number that included changes to the preferences that requires handling. All
@@ -174,12 +163,6 @@ public class AnkiDroidApp extends MultiDexApplication {
 
     /** Our ACRA configurations, initialized during onCreate() */
     private CoreConfigurationBuilder acraCoreConfigBuilder;
-
-
-    @NonNull
-    public static InputStream getResourceAsStream(@NonNull String name) {
-        return sInstance.getApplicationContext().getClassLoader().getResourceAsStream(name);
-    }
 
 
     /**
@@ -200,13 +183,6 @@ public class AnkiDroidApp extends MultiDexApplication {
         ACRA.init(this, acraCoreConfigBuilder);
     }
 
-    @Override
-    protected void attachBaseContext(Context base) {
-        //update base context with preferred app language before attach
-        //possible since API 17, only supported way since API 25
-        //for API < 17 we update the configuration directly
-        super.attachBaseContext(updateContextWithLanguage(base));
-    }
 
     /**
      * On application creation.
@@ -214,15 +190,6 @@ public class AnkiDroidApp extends MultiDexApplication {
     @Override
     public void onCreate() {
         super.onCreate();
-        if (sInstance != null) {
-            Timber.i("onCreate() called multiple times");
-            //5887 - fix crash.
-            if (sInstance.getResources() == null) {
-                Timber.w("Skipping re-initialisation - no resources. Maybe uninstalling app?");
-                return;
-            }
-        }
-        sInstance = this;
         // Get preferences
         SharedPreferences preferences = getSharedPrefs(this);
 
@@ -239,21 +206,14 @@ public class AnkiDroidApp extends MultiDexApplication {
         }
         Timber.tag(TAG);
 
-        Timber.d("Startup - Application Start");
-
         // analytics after ACRA, they both install UncaughtExceptionHandlers but Analytics chains while ACRA does not
         UsageAnalytics.initialize(this);
         if (BuildConfig.DEBUG) {
             UsageAnalytics.setDryRun(true);
         }
 
-        //Stop after analytics and logging are initialised.
-        if (ACRA.isACRASenderServiceProcess()) {
-            Timber.d("Skipping AnkiDroidApp.onCreate from ACRA sender process");
-            return;
-        }
-
-        CardBrowserContextMenu.ensureConsistentStateWithSharedPreferences(this);
+        sInstance = this;
+        setLanguage(preferences.getString(Preferences.LANGUAGE, ""));
         NotificationChannels.setup(getApplicationContext());
 
         // Configure WebView to allow file scheme pages to access cookies.
@@ -271,7 +231,7 @@ public class AnkiDroidApp extends MultiDexApplication {
         CardBrowser.clearLastDeckId();
 
         // Create the AnkiDroid directory if missing. Send exception report if inaccessible.
-        if (Permissions.hasStorageAccessPermission(this)) {
+        if (CollectionHelper.hasStorageAccessPermission(this)) {
             try {
                 String dir = CollectionHelper.getCurrentAnkiDroidDirectory(this);
                 CollectionHelper.initializeAnkiDroidDirectory(dir);
@@ -284,15 +244,17 @@ public class AnkiDroidApp extends MultiDexApplication {
                 }
             }
         }
-
-        Timber.i("AnkiDroidApp: Starting Services");
         new BootService().onReceive(this, new Intent(this, BootService.class));
-
-        // Register BroadcastReceiver NotificationService
-        NotificationService ns = new NotificationService();
-        LocalBroadcastManager lbm = LocalBroadcastManager.getInstance(this);
-        lbm.registerReceiver(ns, new IntentFilter(NotificationService.INTENT_ACTION));
     }
+
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Preserve the language from the settings, e.g. when the device is rotated
+        setLanguage(getSharedPrefs(this).getString(Preferences.LANGUAGE, ""));
+    }
+
 
 
     /**
@@ -324,10 +286,6 @@ public class AnkiDroidApp extends MultiDexApplication {
         return Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState());
     }
 
-    /** Used when we don't have an exception to throw, but we know something is wrong and want to diagnose it */
-    public static void sendExceptionReport(@NonNull String message, String origin) {
-        sendExceptionReport(new ManuallyReportedException(message), origin, null);
-    }
 
     public static void sendExceptionReport(Throwable e, String origin) {
         sendExceptionReport(e, origin, null);
@@ -335,25 +293,12 @@ public class AnkiDroidApp extends MultiDexApplication {
 
 
     public static void sendExceptionReport(Throwable e, String origin, String additionalInfo) {
-        sendExceptionReport(e, origin, additionalInfo, false);
-    }
-
-
-    public static void sendExceptionReport(Throwable e, String origin, String additionalInfo, boolean onlyIfSilent) {
         UsageAnalytics.sendAnalyticsException(e, false);
-
-        if (onlyIfSilent) {
-            boolean alwaysAccept = getSharedPrefs(getInstance().getApplicationContext()).getBoolean(ACRA.PREF_ALWAYS_ACCEPT, false);
-            if (!alwaysAccept) {
-                Timber.i("sendExceptionReport - onlyIfSilent true, but ACRA is not 'always accept'. Skipping report send.");
-                return;
-            }
-        }
-
         ACRA.getErrorReporter().putCustomData("origin", origin);
         ACRA.getErrorReporter().putCustomData("additionalInfo", additionalInfo);
         ACRA.getErrorReporter().handleException(e);
     }
+
 
     /**
      * If you want to make sure that the next exception of any time is posted, you need to clear limiter data
@@ -365,84 +310,23 @@ public class AnkiDroidApp extends MultiDexApplication {
         context.getFileStreamPath("ACRA-limiter.json").delete();
     }
 
-    /**
-     *  Returns a Context with the correct, saved language, to be attached using attachBase().
-     *  For old APIs directly sets language using deprecated functions
-     *
-     * @param remoteContext The base context offered by attachBase() to be passed to super.attachBase().
-     *                      Can be modified here to set correct GUI language.
-     */
-    @SuppressWarnings("deprecation")
-    @NonNull
-    public static Context updateContextWithLanguage(@NonNull Context remoteContext) {
-        try {
-            SharedPreferences preferences;
-            //sInstance (returned by getInstance() ) set during application OnCreate()
-            //if getInstance() is null, the method is called during applications attachBaseContext()
-            // and preferences need mBase directly (is provided by remoteContext during attachBaseContext())
-            if (getInstance() != null) {
-                preferences = getSharedPrefs(getInstance().getBaseContext());
-            } else {
-                preferences = getSharedPrefs(remoteContext);
-            }
-            Configuration langConfig = getLanguageConfig(remoteContext.getResources().getConfiguration(), preferences);
-            //API level >= 25: supported since API 17
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                return remoteContext.createConfigurationContext(langConfig);
-            } else {
-                //API level < 25:
-                remoteContext.getResources().updateConfiguration(langConfig, remoteContext.getResources().getDisplayMetrics());
-                return remoteContext;
-            }
-        } catch (Exception e) {
-            Timber.e(e, "failed to update context with new language");
-            //during AnkiDroidApp.attachBaseContext() ACRA is not initialized, so the exception report will not be sent
-            sendExceptionReport(e,"AnkiDroidApp.updateContextWithLanguage");
-            return remoteContext;
-        }
-    }
 
     /**
-     *  Creates and returns a new configuration with the chosen GUI language that is saved in the preferences
+     * Sets the user language.
      *
-     * @param remoteConfig The configuration of the remote context to set the language for
-     * @param prefs
+     * @param localeCode The locale code of the language to set, system language if empty
      */
-    @SuppressWarnings("deprecation")
-    @NonNull
-    private static Configuration getLanguageConfig(@NonNull Configuration remoteConfig, @NonNull SharedPreferences prefs) {
-        Configuration newConfig = new Configuration(remoteConfig);
-        Locale newLocale = LanguageUtil.getLocale(prefs.getString(Preferences.LANGUAGE, ""), prefs);
-        Timber.d("AnkiDroidApp::getLanguageConfig - setting locale to %s", newLocale);
-        //API level >=24
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            //Build list of locale strings, separated by commas: newLocale as first element
-            String strLocaleList = newLocale.toLanguageTag();
-            //if Anki locale from settings is no equal to system default, add system default as second item
-            //LocaleList must not contain language tags twice, will crash otherwise!
-            if (!strLocaleList.contains(Locale.getDefault().toLanguageTag())) {
-                strLocaleList = strLocaleList + "," + Locale.getDefault().toLanguageTag();
-            }
-
-            LocaleList newLocaleList = LocaleList.forLanguageTags(strLocaleList);
-            //first element of setLocales() is automatically setLocal()
-            newConfig.setLocales(newLocaleList);
-        } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                //API level >=17 but <24
-                newConfig.setLocale(newLocale);
-            } else {
-                //Legacy, API level <17
-                newConfig.locale = newLocale;
-            }
-        }
-
-        return newConfig;
+    @SuppressWarnings("deprecation") // Tracked as #4729 in github
+    public static void setLanguage(String localeCode) {
+        Configuration config = getInstance().getResources().getConfiguration();
+        Locale newLocale = LanguageUtil.getLocale(localeCode);
+        config.locale = newLocale;
+        getInstance().getResources().updateConfiguration(config, getInstance().getResources().getDisplayMetrics());
     }
 
 
     public static boolean initiateGestures(SharedPreferences preferences) {
-        boolean enabled = preferences.getBoolean("gestures", false);
+        Boolean enabled = preferences.getBoolean("gestures", false);
         if (enabled) {
             int sensitivity = preferences.getInt("swipeSensitivity", 100);
             if (sensitivity != 100) {
@@ -517,14 +401,12 @@ public class AnkiDroidApp extends MultiDexApplication {
      * @return
      */
     public static String getFeedbackUrl() {
-        //TODO actually this can be done by translating "link_help" string for each language when the App is
-        // properly translated
         if (isCurrentLanguage("ja")) {
-            return getAppResources().getString(R.string.link_help_ja);
+            return sInstance.getResources().getString(R.string.link_help_ja);
         } else if (isCurrentLanguage("zh")) {
-            return getAppResources().getString(R.string.link_help_zh);
+            return sInstance.getResources().getString(R.string.link_help_zh);
         } else {
-            return getAppResources().getString(R.string.link_help);
+            return sInstance.getResources().getString(R.string.link_help);
         }
     }
 
@@ -533,14 +415,12 @@ public class AnkiDroidApp extends MultiDexApplication {
      * @return
      */
     public static String getManualUrl() {
-        //TODO actually this can be done by translating "link_manual" string for each language when the App is
-        // properly translated
         if (isCurrentLanguage("ja")) {
-            return getAppResources().getString(R.string.link_manual_ja);
+            return sInstance.getResources().getString(R.string.link_manual_ja);
         } else if (isCurrentLanguage("zh")) {
-            return getAppResources().getString(R.string.link_manual_zh);
+            return sInstance.getResources().getString(R.string.link_manual_zh);
         } else {
-            return getAppResources().getString(R.string.link_manual);
+            return sInstance.getResources().getString(R.string.link_manual);
         }
     }
 
@@ -551,7 +431,7 @@ public class AnkiDroidApp extends MultiDexApplication {
      */
     private static boolean isCurrentLanguage(String l) {
         String pref = getSharedPrefs(sInstance).getString(Preferences.LANGUAGE, "");
-        return pref.equals(l) || "".equals(pref) && Locale.getDefault().getLanguage().equals(l);
+        return pref.equals(l) || pref.equals("") && Locale.getDefault().getLanguage().equals(l);
     }
 
     /**
@@ -632,5 +512,4 @@ public class AnkiDroidApp extends MultiDexApplication {
             }
         }
     }
-
 }

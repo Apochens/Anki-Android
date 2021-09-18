@@ -41,15 +41,11 @@ public class BeolingusParser {
     public static String getPronunciationAddressFromTranslation(String html, String wordToSearchFor) {
         Matcher m = PRONUNC_PATTERN.matcher(html);
         while (m.find()) {
-            //Perform .contains() due to #5376 (a "%20{noun}" suffix).
-            //Perform .toLowerCase() due to #5810 ("hello" should match "Hello").
-            //See #5810 for discussion on Locale complexities. Currently unhandled.
-            if (m.group(2).toLowerCase().contains(wordToSearchFor.toLowerCase())) {
+            if (m.group(2).equals(wordToSearchFor)) {
                 Timber.d("pronunciation URL is https://dict.tu-chemnitz.de%s", m.group(1));
                 return "https://dict.tu-chemnitz.de" + m.group(1);
             }
         }
-        Timber.d("Unable to find pronunciation URL");
         return "no";
     }
 
@@ -65,7 +61,6 @@ public class BeolingusParser {
             Timber.d("MP3 address is https://dict.tu-chemnitz.de%s", m.group(1));
             return "https://dict.tu-chemnitz.de" + m.group(1);
         }
-        Timber.d("Unable to find MP3 file address");
         return "no";
     }
 

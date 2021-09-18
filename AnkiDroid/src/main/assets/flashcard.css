@@ -3,11 +3,6 @@ body {
   padding: 0px;
 }
 
-.nightMode .latex {
-     filter: invert(100%);
-}
-
-
 body.night_mode {
   color: white;
   background-color: black;

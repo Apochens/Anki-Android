@@ -24,23 +24,11 @@ import android.content.Context;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatImageButton;
-
-import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
-
-import com.ichi2.anki.AnkiDroidApp;
-import com.ichi2.anki.CollectionHelper;
+import android.widget.Toast;
 import com.ichi2.anki.R;
-import com.ichi2.anki.Reviewer;
-import com.ichi2.libanki.Collection;
-import com.ichi2.anki.UIUtils;
-import java.io.File;
-import java.io.IOException;
-import com.ichi2.utils.Permissions;
 
 import timber.log.Timber;
 
@@ -79,28 +67,7 @@ public class AudioView extends LinearLayout {
 
     public static AudioView createRecorderInstance(Context context, int resPlay, int resPause, int resStop,
             int resRecord, int resRecordStop, String audioPath) {
-        try {
         return new AudioView(context, resPlay, resPause, resStop, resRecord, resRecordStop, audioPath);
-        } catch(Exception e) {
-            Timber.e(e);
-            AnkiDroidApp.sendExceptionReport(e, "Unable to create recorder tool bar");
-            UIUtils.showThemedToast(context,
-                    context.getText(R.string.multimedia_editor_audio_view_create_failed).toString(), true);
-            return null;
-        }
-    }
-
-    public static @Nullable
-    String generateTempAudioFile(@NonNull Context context) {
-        String tempAudioPath;
-        try {
-            File storingDirectory = context.getCacheDir();
-            tempAudioPath = File.createTempFile("ankidroid_audiorec", ".3gp", storingDirectory).getAbsolutePath();
-        } catch (IOException e) {
-            Timber.e(e, "Could not create temporary audio file.");
-            tempAudioPath = null;
-        }
-        return tempAudioPath;
     }
 
 
@@ -124,6 +91,13 @@ public class AudioView extends LinearLayout {
     }
 
 
+    private void showToast(String msg) {
+        int duration = Toast.LENGTH_SHORT;
+        Toast toast = Toast.makeText(mContext, msg, duration);
+        toast.show();
+    }
+
+
     private String gtxt(int id) {
         return mContext.getText(id).toString();
     }
@@ -136,7 +110,6 @@ public class AudioView extends LinearLayout {
         mResRecordStopImage = resRecordStop;
 
         this.setOrientation(HORIZONTAL);
-        this.setGravity(Gravity.CENTER);
 
         mRecord = new RecordButton(context);
         addView(mRecord, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
@@ -192,12 +165,7 @@ public class AudioView extends LinearLayout {
 
     public void notifyStopRecord() {
         if (mRecorder != null && mStatus == Status.RECORDING) {
-            try {
-                mRecorder.stop();
-            } catch (RuntimeException e) {
-                Timber.i(e, "Recording stop failed, this happens if stop was hit immediately after start");
-                UIUtils.showThemedToast(mContext, gtxt(R.string.multimedia_editor_audio_view_recording_failed), true);
-            }
+            mRecorder.stop();
             mStatus = Status.IDLE;
             if (mOnRecordingFinishEventListener != null) {
                 mOnRecordingFinishEventListener.onRecordingFinish(AudioView.this);
@@ -242,7 +210,7 @@ public class AudioView extends LinearLayout {
                             notifyPlay();
                         } catch (Exception e) {
                             Timber.e(e);
-                            UIUtils.showThemedToast(mContext, gtxt(R.string.multimedia_editor_audio_view_playing_failed), true);
+                            showToast(gtxt(R.string.multimedia_editor_audio_view_playing_failed));
                             mStatus = Status.IDLE;
                         }
                         break;
@@ -365,15 +333,6 @@ public class AudioView extends LinearLayout {
                     return;
                 }
 
-                //We can get to this screen without permissions through the "Pronunciation" feature.
-                if (!Permissions.canRecordAudio(mContext)) {
-                    Timber.w("Audio recording permission denied.");
-                    UIUtils.showThemedToast(mContext,
-                            getResources().getString(R.string.multimedia_editor_audio_permission_denied),
-                            true);
-                    return;
-                }
-
                 switch (mStatus) {
                     case IDLE: // If not already recorded or not already played
                     case STOPPED: // if already recorded or played
@@ -407,7 +366,7 @@ public class AudioView extends LinearLayout {
                             } catch (Exception e) {
                                 // either output file failed or codec didn't work, in any case fail out
                                 Timber.e("RecordButton.onClick() :: error recording to " + mAudioPath + "\n" +e.getMessage());
-                                UIUtils.showThemedToast(mContext, gtxt(R.string.multimedia_editor_audio_view_recording_failed), true);
+                                showToast(gtxt(R.string.multimedia_editor_audio_view_recording_failed));
                                 mStatus = Status.STOPPED;
                                 break;
                             }

@@ -110,11 +110,6 @@
             android:key="@string/answer_buttons_position_preference"
             android:title="@string/answer_buttons_position" />
         <CheckBoxPreference
-            android:key="showTopbar"
-            android:defaultValue="true"
-            android:summary="@string/show_top_bar_summ"
-            android:title="@string/show_top_bar" />
-        <CheckBoxPreference
             android:key="showProgress"
             android:summary="@string/show_progress_summ"
             android:title="@string/show_progress" />
@@ -146,7 +141,7 @@
             android:summary="@string/timeout_answer_summ"
             android:title="@string/timeout_answer_text" />
         <com.ichi2.ui.SeekBarPreference
-            android:defaultValue="20"
+            android:defaultValue="6"
             android:dependency="timeoutAnswer"
             android:key="timeoutAnswerSeconds"
             android:max="30"

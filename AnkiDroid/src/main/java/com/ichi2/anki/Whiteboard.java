@@ -26,23 +26,13 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PathMeasure;
 import android.graphics.Point;
-import androidx.annotation.NonNull;
+import android.graphics.PointF;
 import androidx.core.content.ContextCompat;
-
-import android.os.Environment;
 import android.view.Display;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
-import android.widget.LinearLayout;
 
-import com.ichi2.libanki.utils.SystemTime;
-import com.ichi2.libanki.utils.TimeUtils;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.lang.ref.WeakReference;
 import java.util.Stack;
 
@@ -75,9 +65,7 @@ public class Whiteboard extends View {
     private boolean mInvertedColors;
     private boolean mMonochrome;
     private boolean mUndoModeActive = false;
-    private final int foregroundColor;
-    private final LinearLayout mColorPalette;
-    private SystemTime mTime = new SystemTime();
+
 
     public Whiteboard(AbstractFlashcardViewer cardViewer, boolean inverted, boolean monochrome) {
         super(cardViewer, null);
@@ -85,7 +73,7 @@ public class Whiteboard extends View {
         mInvertedColors = inverted;
         mMonochrome = monochrome;
 
-
+        int foregroundColor;
         if (!mInvertedColors) {
             if (mMonochrome) {
                 foregroundColor = Color.BLACK;
@@ -112,16 +100,6 @@ public class Whiteboard extends View {
         createBitmap();
         mPath = new Path();
         mBitmapPaint = new Paint(Paint.DITHER_FLAG);
-
-        // selecting pen color to draw
-        mColorPalette = (LinearLayout) cardViewer.findViewById(R.id.whiteboard_pen_color);
-
-        ((Button) cardViewer.findViewById(R.id.pen_color_white)).setOnClickListener(this::onClick);
-        ((Button) cardViewer.findViewById(R.id.pen_color_black)).setOnClickListener(this::onClick);
-        ((Button) cardViewer.findViewById(R.id.pen_color_red)).setOnClickListener(this::onClick);
-        ((Button) cardViewer.findViewById(R.id.pen_color_green)).setOnClickListener(this::onClick);
-        ((Button) cardViewer.findViewById(R.id.pen_color_blue)).setOnClickListener(this::onClick);
-        ((Button) cardViewer.findViewById(R.id.pen_color_yellow)).setOnClickListener(this::onClick);
     }
 
 
@@ -228,7 +206,7 @@ public class Whiteboard extends View {
     public void undo() {
         mUndo.pop();
         mUndo.apply();
-        if (undoEmpty() && mCardViewer.get() != null) {
+        if (undoSize() == 0 && mCardViewer.get() != null) {
             mCardViewer.get().supportInvalidateOptionsMenu();
         }
     }
@@ -238,11 +216,6 @@ public class Whiteboard extends View {
      */
     public int undoSize() {
         return mUndo.size();
-    }
-
-    /** @return Whether there are strokes to undo */
-    public boolean undoEmpty() {
-        return mUndo.empty();
     }
 
     /**
@@ -263,7 +236,11 @@ public class Whiteboard extends View {
         // To fix issue #1336, just make the whiteboard big and square.
         final Point p = getDisplayDimenions();
         int bitmapSize = Math.max(p.x, p.y);
-        createBitmap(bitmapSize, bitmapSize, Bitmap.Config.ARGB_4444);
+        if (mMonochrome && !mInvertedColors) {
+            createBitmap(bitmapSize, bitmapSize, Bitmap.Config.ALPHA_8);
+        } else {
+            createBitmap(bitmapSize, bitmapSize, Bitmap.Config.ARGB_4444);
+        }
     }
 
     private void drawStart(float x, float y) {
@@ -290,10 +267,13 @@ public class Whiteboard extends View {
         mCurrentlyDrawing = false;
         PathMeasure pm = new PathMeasure(mPath, false);
         mPath.lineTo(mX, mY);
-        Paint paint = new Paint(mPaint);
-        WhiteboardAction action = pm.getLength() > 0 ? new DrawPath(new Path(mPath), paint) : new DrawPoint(mX, mY, paint);
-        action.apply(mCanvas);
-        mUndo.add(action);
+        if (pm.getLength() > 0) {
+            mCanvas.drawPath(mPath, mPaint);
+            mUndo.add(mPath);
+        } else {
+            mCanvas.drawPoint(mX, mY, mPaint);
+            mUndo.add(mX, mY);
+        }
         mUndoModeActive = true;
         // kill the path so we don't double draw
         mPath.reset();
@@ -371,150 +351,56 @@ public class Whiteboard extends View {
         return point;
     }
 
-
-    public void onClick(View view) {
-
-        switch (view.getId()) {
-            case R.id.pen_color_white:
-                mPaint.setColor(Color.WHITE);
-                mColorPalette.setVisibility(View.GONE);
-                break;
-            case R.id.pen_color_black:
-                mPaint.setColor(Color.BLACK);
-                mColorPalette.setVisibility(View.GONE);
-                break;
-            case R.id.pen_color_red:
-                int redPenColor = ContextCompat.getColor(getContext(), R.color.material_red_500);
-                mPaint.setColor(redPenColor);
-                mColorPalette.setVisibility(View.GONE);
-                break;
-            case R.id.pen_color_green:
-                int greenPenColor = ContextCompat.getColor(getContext(), R.color.material_green_500);
-                mPaint.setColor(greenPenColor);
-                mColorPalette.setVisibility(View.GONE);
-                break;
-            case R.id.pen_color_blue:
-                int bluePenColor = ContextCompat.getColor(getContext(), R.color.material_blue_500);
-                mPaint.setColor(bluePenColor);
-                mColorPalette.setVisibility(View.GONE);
-                break;
-            case R.id.pen_color_yellow:
-                int yellowPenColor = ContextCompat.getColor(getContext(), R.color.material_yellow_500);
-                mPaint.setColor(yellowPenColor);
-                mColorPalette.setVisibility(View.GONE);
-                break;
-            default:
-                break;
-        }
-    }
-
     /**
      * Keep a stack of all points and paths so that the last stroke can be undone
      * pop() removes the last stroke from the stack, and apply() redraws it to whiteboard.
      */
     private class UndoStack {
-        private final Stack<WhiteboardAction> mStack = new Stack<>();
+        private final Stack<Path> mPathStack = new Stack<>();
+        private final Stack<PointF> mPointStack = new Stack<>();
+        private final Stack<Integer> mWhichStack = new Stack<>();
 
-        public void add(WhiteboardAction action) {
-            mStack.add(action);
+        public void add(Path path) {
+            mPathStack.add(new Path(path));
+            mWhichStack.add(0);
+        }
+        public void add(float x, float y) {
+            mPointStack.add(new PointF(x, y));
+            mWhichStack.add(1);
         }
 
         public void clear() {
-            mStack.clear();
+            mPathStack.clear();
+            mPointStack.clear();
+            mWhichStack.clear();
         }
 
         public int size() {
-            return mStack.size();
+            return mWhichStack.size();
         }
 
         public void pop() {
-            mStack.pop();
+            if (mWhichStack.size() == 0) return;
+            switch (mWhichStack.peek()) {
+                case 0:
+                    mPathStack.pop();
+                    break;
+                case 1:
+                    mPointStack.pop();
+                    break;
+            }
+            mWhichStack.pop();
         }
 
         public void apply() {
             mBitmap.eraseColor(0);
-
-            for (WhiteboardAction action : mStack) {
-                action.apply(mCanvas);
+            for (Path path : mPathStack) {
+                mCanvas.drawPath(path, mPaint);
+            }
+            for (PointF point : mPointStack) {
+                mCanvas.drawPoint(point.x, point.y, mPaint);
             }
             invalidate();
         }
-
-        public boolean empty() {
-            return mStack.empty();
-        }
-    }
-
-    private interface WhiteboardAction {
-        void apply(@NonNull Canvas canvas);
-    }
-
-    private static class DrawPoint implements WhiteboardAction {
-
-        private final float mX;
-        private final float mY;
-        private final Paint mPaint;
-
-
-        public DrawPoint(float x, float y, Paint paint) {
-            mX = x;
-            mY = y;
-            mPaint = paint;
-        }
-
-
-        @Override
-        public void apply(@NonNull Canvas canvas) {
-            canvas.drawPoint(mX, mY, mPaint);
-        }
-    }
-
-    private static class DrawPath implements WhiteboardAction {
-        private final Path mPath;
-        private final Paint mPaint;
-
-        public DrawPath(Path path, Paint paint) {
-            mPath = path;
-            mPaint = paint;
-        }
-
-
-        @Override
-        public void apply(@NonNull Canvas canvas) {
-            canvas.drawPath(mPath, mPaint);
-        }
-    }
-
-    public boolean isCurrentlyDrawing() {
-        return mCurrentlyDrawing;
-    }
-
-    protected String saveWhiteboard() throws FileNotFoundException {
-
-        Bitmap bitmap = Bitmap.createBitmap(this.getWidth(), this.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-
-        File pictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        File ankiDroidFolder = new File(pictures, "AnkiDroid");
-
-        if (!ankiDroidFolder.exists()) {
-            ankiDroidFolder.mkdirs();
-        }
-
-        String baseFileName = "Whiteboard";
-        String timeStamp = TimeUtils.getTimestamp(mTime);
-        String finalFileName = baseFileName + timeStamp + ".png";
-
-        File saveWhiteboardImagFile = new File(ankiDroidFolder, finalFileName);
-
-        if (foregroundColor != Color.BLACK) {
-            canvas.drawColor(Color.BLACK);
-        } else {
-            canvas.drawColor(Color.WHITE);
-        }
-
-        this.draw(canvas);
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, new FileOutputStream(saveWhiteboardImagFile));
-        return saveWhiteboardImagFile.getAbsolutePath();
     }
 }

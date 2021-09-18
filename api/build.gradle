@@ -5,15 +5,15 @@ def artifactId = "api"
 def version = "1.1.0alpha6"
 
 repositories {
+    maven{url'https://maven.aliyun.com/repository/public'}
+    maven{url'https://maven.aliyun.com/repository/google'}
     google()
-    jcenter()
 }
 android {
     compileSdkVersion 28
 
     defaultConfig {
         minSdkVersion 8
-        //noinspection OldTargetApi
         targetSdkVersion 28
         versionCode 11016   // 4th digit: 1=alpha, 2=beta, 3=official
         versionName version
@@ -29,10 +29,6 @@ android {
             includeAndroidResources = true
         }
     }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
     testOptions.unitTests.all {
         testLogging {
             events "failed", "skipped"
@@ -46,12 +42,10 @@ android {
     }
 }
 
-apply from: "../lint.gradle"
-
 dependencies {
     api fileTree(dir: 'libs', include: ['*.jar'])
-    testImplementation 'org.junit.vintage:junit-vintage-engine:5.6.2'
-    testImplementation 'org.robolectric:robolectric:4.3.1'
+    testImplementation 'org.junit.vintage:junit-vintage-engine:5.5.0'
+    testImplementation "org.robolectric:robolectric:4.2.1"
 }
 
 // Borrowed from here:

@@ -39,6 +39,7 @@ public class CardBrowserOrderDialog extends AnalyticsDialogFragment {
                     items[i] = items[i] + " (\u25b2)";
                 } else {
                     items[i] = items[i] + " (\u25bc)";
+
                 }
             }
         }

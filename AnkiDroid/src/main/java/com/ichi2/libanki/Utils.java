@@ -26,20 +26,16 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.net.Uri;
-import android.text.Spanned;
-
 import androidx.annotation.NonNull;
-import android.os.StatFs;
 
 import com.ichi2.anki.AnkiFont;
 import com.ichi2.anki.CollectionHelper;
 import com.ichi2.anki.R;
 import com.ichi2.compat.CompatHelper;
-import com.ichi2.utils.ImportUtils;
 
-import com.ichi2.utils.JSONArray;
-import com.ichi2.utils.JSONException;
-import com.ichi2.utils.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -59,7 +55,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
@@ -69,8 +64,8 @@ import java.util.Random;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
-import org.apache.commons.compress.archivers.zip.ZipFile;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import timber.log.Timber;
 
@@ -82,9 +77,6 @@ public class Utils {
 
     public static final int CHUNK_SIZE = 32768;
 
-    private static final long TIME_MINUTE_LONG = 60;  // seconds
-    private static final long TIME_HOUR_LONG = 60 * TIME_MINUTE_LONG;
-    private static final long TIME_DAY_LONG = 24 * TIME_HOUR_LONG;
     // These are doubles on purpose because we want a rounded, not integer result later.
     private static final double TIME_MINUTE = 60.0;  // seconds
     private static final double TIME_HOUR = 60 * TIME_MINUTE;
@@ -103,11 +95,10 @@ public class Utils {
     private Utils() { }
 
     // Regex pattern used in removing tags from text before diff
-    private static final Pattern stylePattern = Pattern.compile("(?si)<style.*?>.*?</style>");
-    private static final Pattern scriptPattern = Pattern.compile("(?si)<script.*?>.*?</script>");
+    private static final Pattern stylePattern = Pattern.compile("(?s)<style.*?>.*?</style>");
+    private static final Pattern scriptPattern = Pattern.compile("(?s)<script.*?>.*?</script>");
     private static final Pattern tagPattern = Pattern.compile("<.*?>");
-    private static final Pattern imgPattern = Pattern.compile("(?i)<img[^>]+src=[\\\"']?([^\\\"'>]+)[\\\"']?[^>]*>");
-    private static final Pattern soundPattern = Pattern.compile("(?i)\\[sound:([^]]+)\\]");
+    private static final Pattern imgPattern = Pattern.compile("<img src=[\\\"']?([^\\\"'>]+)[\\\"']? ?/?>");
     private static final Pattern htmlEntitiesPattern = Pattern.compile("&#?\\w+;");
 
     private static final String ALL_CHARACTERS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -122,56 +113,21 @@ public class Utils {
 
 
     /**The time in integer seconds. Pass scale=1000 to get milliseconds. */
-    public static long intTime() {
-        return intTime(1);
+    public static long intNow() {
+        return intNow(1);
     }
-    public static long intTime(int scale) {
+    public static long intNow(int scale) {
         return (long) (now() * scale);
     }
 
     /**
      * Return a string representing a time quantity
      *
-     * Equivalent to Anki's anki/utils.py's shortTimeFmt, applied to a number.
-     * I.e. equivalent to Anki's anki/utils.py's fmtTimeSpan, with the parameter short=True.
-     *
      * @param context The application's environment.
      * @param time_s The time to format, in seconds
-     * @return The time quantity string. Something like "3 s" or "1.7
-     * yr". Only months and year have a number after the decimal.
+     * @return The time quantity string. Something like "3 s" or "1.7 yr".
      */
-    public static String timeQuantityTopDeckPicker(Context context, long time_s) {
-        Resources res = context.getResources();
-        // N.B.: the integer s, min, h, d and (one decimal, rounded by format) double for month, year is
-        // hard-coded. See also 01-core.xml
-        if (Math.abs(time_s) < TIME_MINUTE ) {
-            return res.getString(R.string.time_quantity_seconds, time_s);
-        } else if (Math.abs(time_s) < TIME_HOUR) {
-            return res.getString(R.string.time_quantity_minutes, (int) Math.round(time_s/TIME_MINUTE));
-        } else if (Math.abs(time_s) < TIME_DAY) {
-            return res.getString(R.string.time_quantity_hours_minutes, (int) Math.round(time_s/TIME_HOUR), (int) Math.round((time_s % TIME_HOUR) / TIME_MINUTE));
-        } else if (Math.abs(time_s) < TIME_MONTH) {
-            return res.getString(R.string.time_quantity_days_hours, (int) Math.round(time_s/TIME_DAY), (int) Math.round((time_s % TIME_DAY) / TIME_HOUR));
-        } else if (Math.abs(time_s) < TIME_YEAR) {
-            return res.getString(R.string.time_quantity_months, time_s/TIME_MONTH);
-        } else {
-            return res.getString(R.string.time_quantity_years, time_s/TIME_YEAR);
-        }
-    }
-
-
-    /**
-     * Return a string representing a time quantity
-     *
-     * Equivalent to Anki's anki/utils.py's shortTimeFmt, applied to a number.
-     * I.e. equivalent to Anki's anki/utils.py's fmtTimeSpan, with the parameter short=True.
-     *
-     * @param context The application's environment.
-     * @param time_s The time to format, in seconds
-     * @return The time quantity string. Something like "3 s" or "1.7
-     * yr". Only months and year have a number after the decimal.
-     */
-    public static String timeQuantityNextIvl(Context context, long time_s) {
+    public static String timeQuantity(Context context, long time_s) {
         Resources res = context.getResources();
         // N.B.: the integer s, min, h, d and (one decimal, rounded by format) double for month, year is
         // hard-coded. See also 01-core.xml
@@ -191,44 +147,12 @@ public class Utils {
     }
 
     /**
-     * Return a string representing how much time remains
-     *
-     * @param context The application's environment.
-     * @param time_s The time to format, in seconds
-     * @return The time quantity string. Something like "3 minutes left" or "2 hours left".
-     */
-    public static String remainingTime(Context context, long time_s) {
-        int time_x;  // Time in unit x
-        int remaining_seconds; // Time not counted in the number in unit x
-        int remaining; // Time in the unit smaller than x
-        Resources res = context.getResources();
-        if (time_s < TIME_HOUR_LONG) {
-            time_x = (int) Math.round(time_s / TIME_MINUTE);
-            return res.getQuantityString(R.plurals.reviewer_window_title, time_x, time_x);
-            //It used to be minutes only. So the word "minutes" is not
-            //explicitly written in the ressource name.
-        } else if (time_s < TIME_DAY_LONG) {
-            time_x = (int) (time_s / TIME_HOUR_LONG);
-            remaining_seconds = (int) (time_s % TIME_HOUR_LONG);
-            remaining = (int) Math.round((float) remaining_seconds / TIME_MINUTE);
-            return res.getQuantityString(R.plurals.reviewer_window_title_hours, time_x, time_x, remaining);
-
-        } else {
-            time_x = (int) (time_s / TIME_DAY_LONG);
-            remaining_seconds = (int) ((float) time_s % TIME_DAY_LONG);
-            remaining = (int) Math.round(remaining_seconds / TIME_HOUR);
-            return res.getQuantityString(R.plurals.reviewer_window_title_days, time_x, time_x, remaining);
-        }
-    }
-
-    /**
      * Return a string representing a time
      * (If you want a certain unit, use the strings directly)
      *
      * @param context The application's environment.
      * @param time_s The time to format, in seconds
      * @return The formatted, localized time string. The time is always an integer.
-     *  e.g. something like "3 seconds" or "1 year".
      */
     public static String timeSpan(Context context, long time_s) {
         int time_x;  // Time in unit x
@@ -257,25 +181,9 @@ public class Utils {
     /**
      * Return a proper string for a time value in seconds
      *
-     * Similar to Anki anki/utils.py's fmtTimeSpan.
-     *
      * @param context The application's environment.
      * @param time_s The time to format, in seconds
-     * @return The formatted, localized time string. The time is always a float. E.g. "27.0 days"
-     */
-    public static String roundedTimeSpanUnformatted(Context context, long time_s) {
-        // As roundedTimeSpan, but without tags; for place where you don't use HTML
-        return roundedTimeSpan(context, time_s).replace("<b>", "").replace("</b>", "");
-    }
-
-    /**
-     * Return a proper string for a time value in seconds
-     *
-     * Similar to Anki anki/utils.py's fmtTimeSpan.
-     *
-     * @param context The application's environment.
-     * @param time_s The time to format, in seconds
-     * @return The formatted, localized time string. The time is always a float. E.g. "<b>27.0</b> days"
+     * @return The formatted, localized time string. The time is always a float.
      */
     public static String roundedTimeSpan(Context context, long time_s) {
         if (Math.abs(time_s) < TIME_DAY) {
@@ -306,50 +214,22 @@ public class Utils {
      * @return The text without the aforementioned tags.
      */
     public static String stripHTML(String s) {
-        s = stripHTMLScriptAndStyleTags(s);
-        Matcher htmlMatcher = tagPattern.matcher(s);
-        s = htmlMatcher.replaceAll("");
-        return entsToTxt(s);
-    }
-
-    /**
-     * Strips <style>...</style> and <script>...</script> HTML tags and content from a string.
-     * @param s The HTML text to be cleaned.
-     * @return The text without the aforementioned tags.
-     */
-    public static String stripHTMLScriptAndStyleTags(String s) {
         Matcher htmlMatcher = stylePattern.matcher(s);
         s = htmlMatcher.replaceAll("");
         htmlMatcher = scriptPattern.matcher(s);
-        return htmlMatcher.replaceAll("");
+        s = htmlMatcher.replaceAll("");
+        htmlMatcher = tagPattern.matcher(s);
+        s = htmlMatcher.replaceAll("");
+        return entsToTxt(s);
     }
 
 
     /**
      * Strip HTML but keep media filenames
      */
-    public static String stripHTMLMedia(@NonNull String s) {
-        return stripHTMLMedia(s, " $1 ");
-    }
-
-
-    public static String stripHTMLMedia(@NonNull String s, String replacement) {
+    public static String stripHTMLMedia(String s) {
         Matcher imgMatcher = imgPattern.matcher(s);
-        return stripHTML(imgMatcher.replaceAll(replacement));
-    }
-
-
-    /**
-     * Strip sound but keep media filenames
-     */
-    public static String stripSoundMedia(String s) {
-        return stripSoundMedia(s, " $1 ");
-    }
-
-
-    public static String stripSoundMedia(String s, String replacement) {
-        Matcher soundMatcher = soundPattern.matcher(s);
-        return soundMatcher.replaceAll(replacement);
+        return stripHTML(imgMatcher.replaceAll(" $1 "));
     }
 
 
@@ -368,9 +248,7 @@ public class Utils {
         Matcher htmlEntities = htmlEntitiesPattern.matcher(html);
         StringBuffer sb = new StringBuffer();
         while (htmlEntities.find()) {
-            final Spanned spanned = CompatHelper.getCompat().fromHtml(htmlEntities.group());
-            final String replacement = Matcher.quoteReplacement(spanned.toString());
-            htmlEntities.appendReplacement(sb, replacement);
+            htmlEntities.appendReplacement(sb, CompatHelper.getCompat().fromHtml(htmlEntities.group()).toString());
         }
         htmlEntities.appendTail(sb);
         return sb.toString();
@@ -470,15 +348,15 @@ public class Utils {
     }
 
     public static Long[] list2ObjectArray(List<Long> list) {
-        return list.toArray(new Long[0]);
+        return list.toArray(new Long[list.size()]);
     }
 
     /** Return a non-conflicting timestamp for table. */
     public static long timestampID(DB db, String table) {
         // be careful not to create multiple objects without flushing them, or they
         // may share an ID.
-        long t = intTime(1000);
-        while (db.queryScalar("SELECT id FROM " + table + " WHERE id = ?", new Object[] {t}) != 0) {
+        long t = intNow(1000);
+        while (db.queryScalar("SELECT id FROM " + table + " WHERE id = " + t) != 0) {
             t += 1;
         }
         return t;
@@ -487,7 +365,7 @@ public class Utils {
 
     /** Return the first safe ID to use. */
     public static long maxID(DB db) {
-        long now = intTime(1000);
+        long now = intNow(1000);
         now = Math.max(now, db.queryLongScalar("SELECT MAX(id) FROM cards"));
         now = Math.max(now, db.queryLongScalar("SELECT MAX(id) FROM notes"));
         return now + 1;
@@ -499,7 +377,7 @@ public class Utils {
         String table = ALL_CHARACTERS + extra;
         int len = table.length();
         String buf = "";
-        int mod;
+        int mod = 0;
         while (num != 0) {
             mod = num % len;
             buf = buf + table.substring(mod, mod + 1);
@@ -520,7 +398,6 @@ public class Utils {
     }
 
     // increment a guid by one, for note type conflicts
-    @SuppressWarnings({"unused"}) //used in Anki
     public static String incGuid(String guid) {
         return new StringBuffer(_incGuid(new StringBuffer(guid).reverse().toString())).reverse().toString();
     }
@@ -530,9 +407,9 @@ public class Utils {
         int idx = table.indexOf(guid.substring(0, 1));
         if (idx + 1 == table.length()) {
             // overflow
-            guid = table.substring(0, 1) + _incGuid(guid.substring(1));
+            guid = table.substring(0, 1) + _incGuid(guid.substring(1, guid.length()));
         } else {
-            guid = table.substring(idx + 1) + guid.substring(1);
+            guid = table.substring(idx + 1) + guid.substring(1, guid.length());
         }
         return guid;
     }
@@ -550,7 +427,11 @@ public class Utils {
     public static Object[] jsonArray2Objects(JSONArray array) {
         Object[] o = new Object[array.length()];
         for (int i = 0; i < array.length(); i++) {
-            o[i] = array.get(i);
+            try {
+                o[i] = array.get(i);
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            }
         }
         return o;
     }
@@ -710,7 +591,7 @@ public class Utils {
             zipEntryToFilenameMap = new HashMap<>();
         }
         for (String requestedEntry : zipEntries) {
-            ZipArchiveEntry ze = zipFile.getEntry(requestedEntry);
+            ZipEntry ze = zipFile.getEntry(requestedEntry);
             if (ze != null) {
                 String name = ze.getName();
                 if (zipEntryToFilenameMap.containsKey(name)) {
@@ -744,40 +625,9 @@ public class Utils {
         return file.getCanonicalPath().startsWith(dir.getCanonicalPath());
     }
 
-    /**
-     * Given a ZipFile, iterate through the ZipEntries to determine the total uncompressed size
-     * TODO warning: vulnerable to resource exhaustion attack if entries contain spoofed sizes
-     *
-     * @param zipFile ZipFile of unknown total uncompressed size
-     * @return total uncompressed size of zipFile
-     */
-    public static long calculateUncompressedSize(ZipFile zipFile) {
-
-        long totalUncompressedSize = 0;
-        Enumeration<ZipArchiveEntry> e = zipFile.getEntries();
-        while (e.hasMoreElements()) {
-            ZipArchiveEntry ze = e.nextElement();
-            totalUncompressedSize += ze.getSize();
-        }
-
-        return totalUncompressedSize;
-    }
-
-
-    /**
-     * Determine available storage space
-     *
-     * @param path the filesystem path you need free space information on
-     * @return long indicating the bytes available for that path
-     */
-    public static long determineBytesAvailable(String path) {
-        return CompatHelper.getCompat().getAvailableBytes(new StatFs(path));
-    }
-
 
     /**
      * Calls {@link #writeToFileImpl(InputStream, String)} and handles IOExceptions
-     * Does not close the provided stream
      * @throws IOException Rethrows exception after a set number of retries
      */
     public static void writeToFile(InputStream source, String destination) throws IOException {
@@ -791,7 +641,6 @@ public class Utils {
                 success = true;
             } catch (IOException e) {
                 if (retryCnt == retries) {
-                    Timber.e("IOException while writing to file, out of retries.");
                     throw e;
                 } else {
                     Timber.e("IOException while writing to file, retrying...");
@@ -882,7 +731,7 @@ public class Utils {
         // Use android.net.Uri class to ensure whole path is properly encoded
         // File.toURL() does not work here, and URLEncoder class is not directly usable
         // with existing slashes
-        if (mediaDir.length() != 0 && !"null".equalsIgnoreCase(mediaDir)) {
+        if (mediaDir.length() != 0 && !mediaDir.equalsIgnoreCase("null")) {
             Uri mediaDirUri = Uri.fromFile(new File(mediaDir));
             return mediaDirUri.toString() +"/";
         }
@@ -986,11 +835,14 @@ public class Utils {
     public static List<File> getImportableDecks(Context context) {
         String deckPath = CollectionHelper.getCurrentAnkiDroidDirectory(context);
         File dir = new File(deckPath);
-        List<File> decks = new ArrayList<>();
+        int deckCount = 0;
+        File[] deckList = null;
         if (dir.exists() && dir.isDirectory()) {
-            File[] deckList = dir.listFiles(pathname -> pathname.isFile() && ImportUtils.isValidPackageName(pathname.getName()));
-            decks.addAll(Arrays.asList(deckList).subList(0, deckList.length));
+            deckList = dir.listFiles(pathname -> pathname.isFile() && pathname.getName().endsWith(".apkg"));
+            deckCount = deckList.length;
         }
+        List<File> decks = new ArrayList<>();
+        decks.addAll(Arrays.asList(deckList).subList(0, deckCount));
         return decks;
     }
 
@@ -1080,27 +932,5 @@ public class Utils {
     public static float randomFloatInRange(float min, float max) {
         Random rand = new Random();
         return rand.nextFloat() * (max - min) + min;
-    }
-
-    /**
-       Set usn to 0 in every object.
-
-       This method is called during full sync, before uploading, so
-       during an instant, the value will be zero while the object is
-       not actually online. This is not a problem because if the sync
-       fails, a full sync will occur again next time.
-
-       @return whether there was a non-zero usn; in this case the list
-       should be saved before the upload.
-     */
-    public static boolean markAsUploaded(ArrayList<JSONObject> ar) {
-        boolean changed = false;
-        for (JSONObject obj: ar) {
-            if (obj.optInt("usn", 1) != 0) {
-                obj.put("usn", 0);
-                changed = true;
-            }
-        }
-        return changed;
     }
 }

@@ -10,15 +10,11 @@ import com.ichi2.anki.R;
 import com.ichi2.anki.UIUtils;
 import com.ichi2.anki.analytics.AnalyticsDialogFragment;
 import com.ichi2.libanki.Utils;
-import com.ichi2.utils.ImportUtils;
 
 import java.io.File;
-import java.net.URLDecoder;
 import java.util.List;
 
-import timber.log.Timber;
-
-public class ImportDialog extends AsyncDialogFragment {
+public class ImportDialog extends AnalyticsDialogFragment {
 
     public static final int DIALOG_IMPORT_HINT = 0;
     public static final int DIALOG_IMPORT_SELECT = 1;
@@ -81,15 +77,15 @@ public class ImportDialog extends AsyncDialogFragment {
                     String[] tts = new String[fileList.size()];
                     final String[] importValues = new String[fileList.size()];
                     for (int i = 0; i < tts.length; i++) {
-                        tts[i] = fileList.get(i).getName();
+                        tts[i] = fileList.get(i).getName().replace(".apkg", "");
                         importValues[i] = fileList.get(i).getAbsolutePath();
                     }
                     return builder.title(res.getString(R.string.import_select_title))
                             .items(tts)
                             .itemsCallback((materialDialog, view, i, charSequence) -> {
                                 String importPath = importValues[i];
-                                // If collection package, we assume the collection will be replaced
-                                if (ImportUtils.isCollectionPackage(filenameFromPath(importPath))) {
+                                // If the apkg file is called "collection.apkg", we assume the collection will be replaced
+                                if (filenameFromPath(importPath).equals("collection.apkg")) {
                                     ((ImportDialogListener) getActivity()).showImportDialog(DIALOG_IMPORT_REPLACE_CONFIRM, importPath);
                                     // Otherwise we add the file since exported decks / shared decks can't be imported via replace anyway
                                 } else {
@@ -100,9 +96,8 @@ public class ImportDialog extends AsyncDialogFragment {
                 }
             }
             case DIALOG_IMPORT_ADD_CONFIRM: {
-                String displayFileName = convertToDisplayName(getArguments().getString("dialogMessage"));
                 return builder.title(res.getString(R.string.import_title))
-                        .content(res.getString(R.string.import_message_add_confirm, filenameFromPath(displayFileName)))
+                        .content(res.getString(R.string.import_message_add_confirm, filenameFromPath(getArguments().getString("dialogMessage"))))
                         .positiveText(res.getString(R.string.import_message_add))
                         .negativeText(res.getString(R.string.dialog_cancel))
                         .onPositive((dialog, which) -> {
@@ -112,9 +107,8 @@ public class ImportDialog extends AsyncDialogFragment {
                         .show();
             }
             case DIALOG_IMPORT_REPLACE_CONFIRM: {
-                String displayFileName = convertToDisplayName(getArguments().getString("dialogMessage"));
                 return builder.title(res.getString(R.string.import_title))
-                        .content(res.getString(R.string.import_message_replace_confirm, displayFileName))
+                        .content(res.getString(R.string.import_message_replace_confirm, getArguments().getString("dialogMessage")))
                         .positiveText(res.getString(R.string.dialog_positive_replace))
                         .negativeText(res.getString(R.string.dialog_cancel))
                         .onPositive((dialog, which) -> {
@@ -126,29 +120,6 @@ public class ImportDialog extends AsyncDialogFragment {
             default:
                 return null;
         }
-    }
-
-
-    private String convertToDisplayName(String name) {
-        //ImportUtils URLEncodes names, which isn't great for display.
-        //NICE_TO_HAVE: Pass in the DisplayFileName closer to the source of the bad data, rather than fixing it here.
-        try {
-            return URLDecoder.decode(name, "UTF-8");
-        } catch (Exception e) {
-            Timber.w("Failed to convert filename to displayable string");
-            return name;
-        }
-    }
-
-
-    @Override
-    public String getNotificationMessage() {
-        return res().getString(R.string.import_interrupted);
-    }
-
-    @Override
-    public String getNotificationTitle() {
-        return res().getString(R.string.import_title);
     }
     
     public void dismissAllDialogFragments() {

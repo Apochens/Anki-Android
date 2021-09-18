@@ -58,93 +58,15 @@ var resizeImages = function() {
     resizeDone = true;
 };
 
-/* Tell the app that we no longer want to focus the WebView and should instead return keyboard
- * focus to a native answer input method.
- * Naming subject to change.
- */
-function _relinquishFocus() {
-    // Clicking on a hint set the Android mouse cursor to a text entry bar, even after navigating
-    // away. This fixes the issue.
-    document.body.style.cursor = "default";
-    window.location.href = "signal:relinquishFocus";
-}
-
 /* Tell the app that the input box got focus. See also
  * AbstractFlashcardViewer and CompatV15 */
 function taFocus() {
     window.location.href = "signal:typefocus";
 }
 
-/*  Call displayCardAnswer() and answerCard() from anki deck template using javascript
- *  See also AbstractFlashcardViewer.
- */
-function showAnswer() {
-    window.location.href = "signal:show_answer";
-}
-function buttonAnswerEase1() {
-    window.location.href = "signal:answer_ease1";
-}
-function buttonAnswerEase2() {
-    window.location.href = "signal:answer_ease2";
-}
-function buttonAnswerEase3() {
-    window.location.href = "signal:answer_ease3";
-}
-function buttonAnswerEase4() {
-    window.location.href = "signal:answer_ease4";
-}
-// Show options menu
-function ankiShowOptionsMenu() {
-    window.location.href = "signal:anki_show_options_menu";
-}
-
-// Show Navigation Drawer
-function ankiShowNavDrawer() {
-    window.location.href = "signal:anki_show_navigation_drawer";
-}
-
-/* Reload card.html */
-function reloadPage() {
-    window.location.href = "signal:reload_card_html";
-}
-
-// Mark current card
-function ankiMarkCard() {
-    window.location.href = "signal:mark_current_card";
-}
-
-/* Toggle flag on card from AnkiDroid Webview using JavaScript
-    Possible values: "none", "red", "orange", "green", "blue"
-    See AnkiDroid Manual for Usage
-*/
-function ankiToggleFlag(flag) {
-    var flagVal = Number.isInteger(flag);
-
-    if (flagVal) {
-        switch (flag) {
-            case 0: window.location.href = "signal:flag_none"; break;
-            case 1: window.location.href = "signal:flag_red"; break;
-            case 2: window.location.href = "signal:flag_orange"; break;
-            case 3: window.location.href = "signal:flag_green"; break;
-            case 4: window.location.href = "signal:flag_blue"; break;
-            default: console.log('No Flag Found'); break;
-        }
-    } else {
-        window.location.href = "signal:flag_" + flag;
-    }
-}
-
-// Show toast using js
-function ankiShowToast(message) {
-    var msg = encodeURI(message);
-    window.location.href = "signal:anki_show_toast:" + msg;
-}
-
 /* Tell the app the text in the input box when it loses focus */
 function taBlur(itag) {
-    //#5944 - percent wasn't encoded, but Mandarin was.
-    var encodedVal = encodeURI(itag.value);
-    window.location.href = "typeblurtext:" + encodedVal;
+    window.location.href = "typeblurtext:" + itag.value;
 }
 
 /* Look at the text entered into the input box and send the text on a return */
@@ -159,9 +81,7 @@ function taKey(itag, e) {
     }
 
     if (keycode == 13) {
-        //#5944 - percent wasn't encoded, but Mandarin was.
-        var encodedVal = encodeURI(itag.value);
-        window.location.href = "typeentertext:" + encodedVal;
+        window.location.href = "typeentertext:" + itag.value;
         return false;
     } else {
         return true;

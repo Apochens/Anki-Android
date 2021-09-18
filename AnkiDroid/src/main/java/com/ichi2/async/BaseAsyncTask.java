@@ -21,12 +21,29 @@ import android.os.AsyncTask;
 import com.ichi2.utils.MethodLogger;
 import com.ichi2.utils.Threads;
 
-import static com.ichi2.anki.AnkiDroidApp.sendExceptionReport;
-
 public class BaseAsyncTask<Params, Progress, Result> extends AsyncTask<Params, Progress, Result> {
 
     /** Set this to {@code true} to enable detailed debugging for this class. */
     private static final boolean DEBUG = false;
+
+    static {
+        // This can actually happen if the first reference to an AsyncTask is made not from the main thread.
+        //
+        // In that case, the static constructor will be invoked by the class loader on the thread that is making the
+        // reference.
+        //
+        // Unfortunately this leads to unexpected consequences, including a Handler being constructed on the wrong
+        // thread.
+        //
+        // See https://code.google.com/p/android/issues/detail?id=20915
+        // This may be removed once targetSdkVersion is >= API16 / Build.VERSION_CODES >= JELLY_BEAN
+        // https://issuetracker.google.com/issues/36934261#comment21 (which is the same issue above, redirected)
+        // https://developer.android.com/reference/android/os/AsyncTask#threading-rules
+        if (DEBUG) {
+            MethodLogger.log();
+        }
+        Threads.checkMainThread();
+    }
 
 
     public BaseAsyncTask() {
@@ -51,9 +68,6 @@ public class BaseAsyncTask<Params, Progress, Result> extends AsyncTask<Params, P
     protected void onPostExecute(Result result) {
         if (DEBUG) {
             MethodLogger.log();
-        }
-        if (isCancelled()) {
-            sendExceptionReport("onPostExecute called with task cancelled. This should never occur !", "BaseAsyncTask - onPostExecute");
         }
         Threads.checkMainThread();
         super.onPostExecute(result);

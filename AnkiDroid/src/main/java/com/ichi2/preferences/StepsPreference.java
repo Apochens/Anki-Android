@@ -26,8 +26,8 @@ import com.ichi2.anki.AnkiDroidApp;
 import com.ichi2.anki.R;
 import com.ichi2.anki.UIUtils;
 
-import com.ichi2.utils.JSONArray;
-import com.ichi2.utils.JSONException;
+import org.json.JSONArray;
+import org.json.JSONException;
 
 public class StepsPreference extends EditTextPreference {
 
@@ -95,10 +95,14 @@ public class StepsPreference extends EditTextPreference {
             return null;
         } else {
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < ja.length(); i++) {
-                sb.append(ja.getString(i)).append(" ");
+            try {
+                for (int i = 0; i < ja.length(); i++) {
+                    sb.append(ja.getString(i)).append(" ");
+                }
+                return sb.toString().trim();
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
             }
-            return sb.toString().trim();
         }
     }
 
@@ -111,8 +115,12 @@ public class StepsPreference extends EditTextPreference {
      */
     public static String convertFromJSON(JSONArray a) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < a.length(); i++) {
-            sb.append(a.getString(i)).append(" ");
+        try {
+            for (int i = 0; i < a.length(); i++) {
+                sb.append(a.getString(i)).append(" ");
+            }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
         return sb.toString().trim();
     }

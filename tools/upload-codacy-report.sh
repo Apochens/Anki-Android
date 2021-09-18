@@ -7,25 +7,16 @@
 
 set -e
 
-export JAR=~/codacy-coverage-reporter-assembly.jar
-
-curl -Ls -o $JAR https://github.com/codacy/codacy-coverage-reporter/releases/download/6.0.6/codacy-coverage-reporter-6.0.6-assembly.jar
+ wget --progress=dot:giga -O ~/codacy-coverage-reporter-assembly-latest.jar https://oss.sonatype.org/service/local/repositories/releases/content/com/codacy/codacy-coverage-reporter/4.0.2/codacy-coverage-reporter-4.0.2-assembly.jar
 
 if [[ ( "$API" != "NONE" ) ]]; then
-    java -jar $JAR report \
+    java -jar ~/codacy-coverage-reporter-assembly-latest.jar report \
         -l Java \
-        -r AnkiDroid/build/reports/jacoco/jacocoAndroidTestReport/jacocoAndroidTestReport.xml \
-        --partial
-fi
-
-if [[ ( "$UNIT_TEST" == "TRUE" ) ]]; then
-    java -jar $JAR report \
-        -l Java \
-        -r AnkiDroid/build/reports/jacoco/jacocoUnitTestReport/jacocoUnitTestReport.xml \
+        -r AnkiDroid/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml \
         --partial
 fi
 
 if [[ ( "$FINALIZE_COVERAGE" == "TRUE" ) ]]; then
-    java -jar $JAR final
+    java -jar ~/codacy-coverage-reporter-assembly-latest.jar final
 fi
 

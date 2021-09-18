@@ -83,6 +83,7 @@ public class StudyOptionsActivity extends NavigationDrawerActivity implements St
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
         Timber.d("onActivityResult (requestCode = %d, resultCode = %d)", requestCode, resultCode);
+        getCurrentFragment().restorePreferences();
     }
 
 
@@ -114,7 +115,7 @@ public class StudyOptionsActivity extends NavigationDrawerActivity implements St
         super.onStop();
         if (colIsOpen()) {
             WidgetStatus.update(this);
-            UIUtils.saveCollectionInBackground();
+            UIUtils.saveCollectionInBackground(this);
         }
     }
 
@@ -136,7 +137,7 @@ public class StudyOptionsActivity extends NavigationDrawerActivity implements St
      */
     @Override
     public void onCreateCustomStudySession() {
-        // Sched already reset by CollectionTask in CustomStudyDialog
+        // Sched already reset by DeckTask in CustomStudyDialog
         getCurrentFragment().refreshInterface();
     }
 

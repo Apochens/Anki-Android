@@ -20,7 +20,6 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
-import androidx.annotation.VisibleForTesting;
 import timber.log.Timber;
 
 
@@ -67,12 +66,11 @@ public class DialogHandler extends Handler {
         mActivity = new WeakReference<>(activity);
     }
 
+
     @Override
     public void handleMessage(Message msg) {
         Bundle msgData = msg.getData();
-        String messageName = sMessageNameList[msg.what];
-        UsageAnalytics.sendAnalyticsScreenView(messageName);
-        Timber.i("Handling Message: %s", messageName);
+        UsageAnalytics.sendAnalyticsScreenView(sMessageNameList[msg.what]);
         if (msg.what == MSG_SHOW_COLLECTION_LOADING_ERROR_DIALOG) {
             // Collection could not be opened
             ((DeckPicker) mActivity.get()).showDatabaseErrorDialog(DatabaseErrorDialog.DIALOG_LOAD_FAILED);
@@ -120,7 +118,7 @@ public class DialogHandler extends Handler {
             SharedPreferences preferences = AnkiDroidApp.getSharedPrefs(mActivity.get());
             Resources res = mActivity.get().getResources();
             String hkey = preferences.getString("hkey", "");
-            boolean limited = Utils.intTime(1000) - preferences.getLong("lastSyncTime", 0) < INTENT_SYNC_MIN_INTERVAL;
+            boolean limited = Utils.intNow(1000) - preferences.getLong("lastSyncTime", 0) < INTENT_SYNC_MIN_INTERVAL;
             if (!limited && hkey.length() > 0 && Connection.isOnline()) {
                 ((DeckPicker) mActivity.get()).sync();
             } else {
@@ -150,14 +148,8 @@ public class DialogHandler extends Handler {
     public void readMessage() {
         Timber.d("Reading persistent message");
         if (sStoredMessage != null) {
-            Timber.i("Dispatching persistent message: %d", sStoredMessage.what);
             sendMessage(sStoredMessage);
         }
-        sStoredMessage = null;
-    }
-
-    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
-    public static void discardMessage() {
         sStoredMessage = null;
     }
 }

@@ -21,11 +21,11 @@ package com.ichi2.anki;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import androidx.appcompat.widget.Toolbar;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
@@ -66,7 +66,10 @@ public class Info extends AnkiActivity {
 
         setContentView(R.layout.info);
         final View mainView = findViewById(android.R.id.content);
-        enableToolbar(mainView);
+        Toolbar toolbar = mainView.findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+        }
 
         setTitle(String.format("%s v%s", VersionUtils.getAppName(), VersionUtils.getPkgVersionName()));
         webView = findViewById(R.id.info);
@@ -82,15 +85,13 @@ public class Info extends AnkiActivity {
         Button marketButton = findViewById(R.id.market);
         marketButton.setOnClickListener(arg0 -> {
             if (mType == TYPE_ABOUT) {
-                final String intentUri = getString(
-                        CompatHelper.isKindle() ? R.string.link_market_kindle : R.string.link_market);
-                final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(intentUri));
-                final PackageManager packageManager = getPackageManager();
-                if (intent.resolveActivity(packageManager) != null) {
+                if (CompatHelper.isKindle()) {
+                    Intent intent = new Intent("android.intent.action.VIEW",
+                            Uri.parse("http://www.amazon.com/gp/mas/dl/android?p=com.ichi2.anki"));
                     startActivityWithoutAnimation(intent);
                 } else {
-                    final String errorMsg = getString(R.string.feedback_no_suitable_app_found);
-                    UIUtils.showThemedToast(Info.this, errorMsg, true);
+                    Info.this.startActivityWithoutAnimation(new Intent(Intent.ACTION_VIEW, Uri
+                            .parse("market://details?id=com.ichi2.anki")));
                 }
                 return;
             }

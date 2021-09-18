@@ -18,29 +18,30 @@ package com.ichi2.anki;
 
 import android.os.Bundle;
 
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.ichi2.anim.ActivityTransitionAnimation;
 import com.ichi2.anki.dialogs.ConfirmationDialog;
 import com.ichi2.anki.dialogs.ModelEditorContextMenu;
 import com.ichi2.anki.exception.ConfirmModSchemaException;
-import com.ichi2.async.CollectionTask;
+import com.ichi2.async.DeckTask;
 import com.ichi2.libanki.Collection;
 import com.ichi2.themes.StyledProgressDialog;
 import com.ichi2.widget.WidgetStatus;
 
-import com.ichi2.utils.JSONArray;
-import com.ichi2.utils.JSONException;
-import com.ichi2.utils.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
-import static com.ichi2.async.CollectionTask.TASK_TYPE.*;
 
 public class ModelFieldEditor extends AnkiActivity {
 
@@ -72,8 +73,12 @@ public class ModelFieldEditor extends AnkiActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.model_field_editor);
 
+        Toolbar toolbar = findViewById(R.id.toolbar);
         mFieldLabelView = findViewById(R.id.note_type_editor_fields);
-        enableToolbar();
+
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+        }
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle(R.string.model_field_editor_title);
@@ -88,7 +93,7 @@ public class ModelFieldEditor extends AnkiActivity {
         super.onStop();
         if (!isFinishing()) {
             WidgetStatus.update(this);
-            UIUtils.saveCollectionInBackground();
+            UIUtils.saveCollectionInBackground(this);
         }
     }
 
@@ -143,10 +148,14 @@ public class ModelFieldEditor extends AnkiActivity {
         mMod = mCol.getModels().get(noteTypeID);
 
         mFieldLabels = new ArrayList<>();
-        mNoteFields = mMod.getJSONArray("flds");
-        for (int i = 0; i < mNoteFields.length(); i++) {
-            JSONObject o = mNoteFields.getJSONObject(i);
-            mFieldLabels.add(o.getString("name"));
+        try {
+            mNoteFields = mMod.getJSONArray("flds");
+            for (int i = 0; i < mNoteFields.length(); i++) {
+                JSONObject o = mNoteFields.getJSONObject(i);
+                mFieldLabels.add(o.getString("name"));
+            }
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -157,7 +166,8 @@ public class ModelFieldEditor extends AnkiActivity {
 
 
     /*
-    * Creates a dialog to create a field
+    * Creates a dialog to rename the currently selected field, short loading ti
+    * Processing time scales with number of items
     */
     private void addFieldDialog() {
         mFieldNameInput = new EditText(this);
@@ -169,18 +179,18 @@ public class ModelFieldEditor extends AnkiActivity {
                 .customView(mFieldNameInput, true)
                 .onPositive((dialog, which) -> {
                     String fieldName = mFieldNameInput.getText().toString()
-                            .replaceAll("[\\n\\r]", "");
+                            .replaceAll("[\'\"\\n\\r\\[\\]\\(\\)]", "");
 
                     if (fieldName.length() == 0) {
-                        UIUtils.showThemedToast(this, getResources().getString(R.string.toast_empty_name), true);
+                        showToast(getResources().getString(R.string.toast_empty_name));
                     } else if (containsField(fieldName)) {
-                        UIUtils.showThemedToast(this, getResources().getString(R.string.toast_duplicate_field), true);
+                        showToast(getResources().getString(R.string.toast_duplicate_field));
                     } else {
                         //Name is valid, now field is added
                         try {
                             mCol.modSchema();
-                            CollectionTask.launchCollectionTask(ADD_FIELD, mChangeFieldHandler,
-                                    new CollectionTask.TaskData(new Object[]{mMod, fieldName}));
+                            DeckTask.launchDeckTask(DeckTask.TASK_TYPE_ADD_FIELD, mChangeFieldHandler,
+                                    new DeckTask.TaskData(new Object[]{mMod, fieldName}));
                         } catch (ConfirmModSchemaException e) {
 
                             //Create dialogue to for schema change
@@ -189,9 +199,9 @@ public class ModelFieldEditor extends AnkiActivity {
                             Runnable confirm = () -> {
                                 mCol.modSchemaNoCheck();
                                 String fieldName1 = mFieldNameInput.getText().toString()
-                                        .replaceAll("[\\n\\r]", "");
-                                CollectionTask.launchCollectionTask(ADD_FIELD, mChangeFieldHandler,
-                                        new CollectionTask.TaskData(new Object[]{mMod, fieldName1}));
+                                        .replaceAll("[\'\"\\n\\r\\[\\]\\(\\)]", "");
+                                DeckTask.launchDeckTask(DeckTask.TASK_TYPE_ADD_FIELD, mChangeFieldHandler,
+                                        new DeckTask.TaskData(new Object[]{mMod, fieldName1}));
                                 dismissContextMenu();
                             };
 
@@ -209,18 +219,23 @@ public class ModelFieldEditor extends AnkiActivity {
 
 
     /*
-     * Creates a dialog to delete the currently selected field
+     * Creates a dialog to rename the currently selected field, short loading ti
+     * Processing time scales with number of items
      */
     private void deleteFieldDialog() {
         Runnable confirm = () -> {
-            mCol.modSchemaNoCheck();
-            deleteField();
+            try {
+                mCol.modSchema(false);
+                deleteField();
+            } catch (ConfirmModSchemaException e) {
+                //This should never be reached because modSchema() didn't throw an exception
+            }
             dismissContextMenu();
         };
 
 
         if (mFieldLabels.size() < 2) {
-            UIUtils.showThemedToast(this, getResources().getString(R.string.toast_last_field), true);
+            showToast(getResources().getString(R.string.toast_last_field));
         } else {
             try {
                 mCol.modSchema();
@@ -240,13 +255,17 @@ public class ModelFieldEditor extends AnkiActivity {
     }
 
     private void deleteField() {
-        CollectionTask.launchCollectionTask(DELETE_FIELD, mChangeFieldHandler,
-                                new CollectionTask.TaskData(new Object[]{mMod, mNoteFields.getJSONObject(mCurrentPos)}));
+        try {
+            DeckTask.launchDeckTask(DeckTask.TASK_TYPE_DELETE_FIELD, mChangeFieldHandler,
+                    new DeckTask.TaskData(new Object[]{mMod, mNoteFields.getJSONObject(mCurrentPos)}));
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 
     /*
-     * Creates a dialog to rename the currently selected field
+     * Creates a dialog to rename the currently selected field, short loading ti
      * Processing time is constant
      */
     private void renameFieldDialog() {
@@ -261,11 +280,11 @@ public class ModelFieldEditor extends AnkiActivity {
                 .onPositive((dialog, which) -> {
 
                         String fieldLabel = mFieldNameInput.getText().toString()
-                                .replaceAll("[\\n\\r]", "");
+                                .replaceAll("[\'\"\\n\\r\\[\\]\\(\\)]", "");
                         if (fieldLabel.length() == 0) {
-                            UIUtils.showThemedToast(this, getResources().getString(R.string.toast_empty_name), true);
+                            showToast(getResources().getString(R.string.toast_empty_name));
                         } else if (containsField(fieldLabel)) {
-                            UIUtils.showThemedToast(this, getResources().getString(R.string.toast_duplicate_field), true);
+                            showToast(getResources().getString(R.string.toast_duplicate_field));
                         } else {
                             //Field is valid, now rename
                             try {
@@ -276,8 +295,8 @@ public class ModelFieldEditor extends AnkiActivity {
                                 ConfirmationDialog c = new ConfirmationDialog();
                                 c.setArgs(getResources().getString(R.string.full_sync_confirmation));
                                 Runnable confirm = () -> {
-                                    mCol.modSchemaNoCheck();
                                     try {
+                                        mCol.modSchema(false);
                                         renameField();
                                     } catch (ConfirmModSchemaException e1) {
                                         //This should never be thrown
@@ -313,18 +332,18 @@ public class ModelFieldEditor extends AnkiActivity {
                         try {
                             pos = Integer.parseInt(newPosition);
                         } catch (NumberFormatException n) {
-                            UIUtils.showThemedToast(this, getResources().getString(R.string.toast_out_of_range), true);
+                            showToast(getResources().getString(R.string.toast_out_of_range));
                             return;
                         }
 
                         if (pos < 1 || pos > mFieldLabels.size()) {
-                            UIUtils.showThemedToast(this, getResources().getString(R.string.toast_out_of_range), true);
+                            showToast(getResources().getString(R.string.toast_out_of_range));
                         } else {
                             // Input is valid, now attempt to modify
                             try {
                                 mCol.modSchema();
-                                CollectionTask.launchCollectionTask(REPOSITION_FIELD, mChangeFieldHandler,
-                                        new CollectionTask.TaskData(new Object[]{mMod,
+                                DeckTask.launchDeckTask(DeckTask.TASK_TYPE_REPOSITION_FIELD, mChangeFieldHandler,
+                                        new DeckTask.TaskData(new Object[]{mMod,
                                                 mNoteFields.getJSONObject(mCurrentPos), pos - 1}));
                             } catch (ConfirmModSchemaException e) {
 
@@ -336,8 +355,8 @@ public class ModelFieldEditor extends AnkiActivity {
                                         mCol.modSchemaNoCheck();
                                         String newPosition1 = mFieldNameInput.getText().toString();
                                         int pos1 = Integer.parseInt(newPosition1);
-                                        CollectionTask.launchCollectionTask(REPOSITION_FIELD,
-                                                mChangeFieldHandler, new CollectionTask.TaskData(new Object[]{mMod,
+                                        DeckTask.launchDeckTask(DeckTask.TASK_TYPE_REPOSITION_FIELD,
+                                                mChangeFieldHandler, new DeckTask.TaskData(new Object[]{mMod,
                                                         mNoteFields.getJSONObject(mCurrentPos), pos1 - 1}));
                                         dismissContextMenu();
                                     } catch (JSONException e1) {
@@ -347,6 +366,8 @@ public class ModelFieldEditor extends AnkiActivity {
                                 c.setConfirm(confirm);
                                 c.setCancel(mConfirmDialogCancel);
                                 ModelFieldEditor.this.showDialogFragment(c);
+                            } catch (JSONException e) {
+                                throw new RuntimeException(e);
                             }
                         }
                     })
@@ -383,12 +404,16 @@ public class ModelFieldEditor extends AnkiActivity {
      * Renames the current field
      */
     private void renameField() throws ConfirmModSchemaException {
-        String fieldLabel = mFieldNameInput.getText().toString()
-                .replaceAll("[\\n\\r]", "");
-        JSONObject field = (JSONObject) mNoteFields.get(mCurrentPos);
-        mCol.getModels().renameField(mMod, field, fieldLabel);
-        mCol.getModels().save();
-        fullRefreshList();
+        try {
+            String fieldLabel = mFieldNameInput.getText().toString()
+                    .replaceAll("[\'\"\\n\\r\\[\\]\\(\\)]", "");
+            JSONObject field = (JSONObject) mNoteFields.get(mCurrentPos);
+            mCol.getModels().renameField(mMod, field, fieldLabel);
+            mCol.getModels().save();
+            fullRefreshList();
+        } catch (JSONException e) {
+            throw new RuntimeException();
+        }
     }
 
 
@@ -398,35 +423,21 @@ public class ModelFieldEditor extends AnkiActivity {
     private void sortByField() {
         try {
             mCol.modSchema();
-            CollectionTask.launchCollectionTask(CHANGE_SORT_FIELD, mChangeFieldHandler,
-                    new CollectionTask.TaskData(new Object[]{mMod, mCurrentPos}));
+            DeckTask.launchDeckTask(DeckTask.TASK_TYPE_CHANGE_SORT_FIELD, mChangeFieldHandler,
+                    new DeckTask.TaskData(new Object[]{mMod, mCurrentPos}));
         } catch (ConfirmModSchemaException e) {
             // Handler mMod schema confirmation
             ConfirmationDialog c = new ConfirmationDialog();
             c.setArgs(getResources().getString(R.string.full_sync_confirmation));
             Runnable confirm = () -> {
                 mCol.modSchemaNoCheck();
-                CollectionTask.launchCollectionTask(CHANGE_SORT_FIELD, mChangeFieldHandler,
-                        new CollectionTask.TaskData(new Object[]{mMod, mCurrentPos}));
+                DeckTask.launchDeckTask(DeckTask.TASK_TYPE_CHANGE_SORT_FIELD, mChangeFieldHandler,
+                        new DeckTask.TaskData(new Object[]{mMod, mCurrentPos}));
                 dismissContextMenu();
             };
             c.setConfirm(confirm);
             c.setCancel(mConfirmDialogCancel);
             ModelFieldEditor.this.showDialogFragment(c);
-        }
-    }
-
-    /*
-     * Toggle the "Remember last input" setting AKA the "Sticky" setting
-     */
-    private void toggleStickyField() {
-        // Get the current field
-        JSONObject field = (JSONObject) mNoteFields.get(mCurrentPos);
-        // If the sticky setting is enabled then disable it, otherwise enable it
-        if (field.getBoolean("sticky")) {
-            field.put("sticky", false);
-        } else {
-            field.put("sticky", true);
         }
     }
 
@@ -453,6 +464,13 @@ public class ModelFieldEditor extends AnkiActivity {
     }
 
 
+    private void showToast(CharSequence text) {
+        int duration = Toast.LENGTH_SHORT;
+        Toast toast = Toast.makeText(this, text, duration);
+        toast.show();
+    }
+
+
     // ----------------------------------------------------------------------------
     // HANDLERS
     // ----------------------------------------------------------------------------
@@ -461,7 +479,7 @@ public class ModelFieldEditor extends AnkiActivity {
     /*
      * Called during the desk task when any field is modified
      */
-    private CollectionTask.TaskListener mChangeFieldHandler = new CollectionTask.TaskListener() {
+    private DeckTask.TaskListener mChangeFieldHandler = new DeckTask.TaskListener() {
 
         @Override
         public void onPreExecute() {
@@ -472,7 +490,7 @@ public class ModelFieldEditor extends AnkiActivity {
         }
 
         @Override
-        public void onPostExecute(CollectionTask.TaskData result) {
+        public void onPostExecute(DeckTask.TaskData result) {
             if (!result.getBoolean()) {
                 closeActivity(DeckPicker.RESULT_DB_ERROR);
             }
@@ -534,9 +552,6 @@ public class ModelFieldEditor extends AnkiActivity {
                 break;
             case ModelEditorContextMenu.FIELD_RENAME:
                 renameFieldDialog();
-                break;
-            case ModelEditorContextMenu.FIELD_TOGGLE_STICKY:
-                toggleStickyField();
                 break;
         }
     };
