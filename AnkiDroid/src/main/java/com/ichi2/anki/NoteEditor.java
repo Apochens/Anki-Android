@@ -1139,7 +1139,7 @@ public class NoteEditor extends AnkiActivity {
             public void onClick(View v) {
 
                 /** Themis-#4707 */
-                Log.i("Themis-#4707", "Step 2: Click \"Media\" button at the field " + index + ".");
+                Log.i("Themis", "Step 2: Click \"Media\" button at the field " + index + ".");
                 /** Themis-#4707 */
 
                 Timber.i("NoteEditor:: Multimedia button pressed for field %d", index);
@@ -1173,7 +1173,7 @@ public class NoteEditor extends AnkiActivity {
                                 case R.id.menu_multimedia_photo:
 
                                     /** Themis-#4707 */
-                                    Log.i("Themis-#4707", "Step 3: Click \"add image\" button at field " + index + ".");
+                                    Log.i("Themis", "Step 3: Click \"add image\" button at field " + index + ".");
                                     /** Themis-#4707 */
 
                                     Timber.i("NoteEditor:: Add image button pressed");
