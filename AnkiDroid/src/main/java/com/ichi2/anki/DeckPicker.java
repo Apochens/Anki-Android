@@ -487,7 +487,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             public void onClick(View view) {
 
                 /** Themis-#4977 */
-                Log.i("Themis-#4977", "Step 1: Clicked the \"Shared decks\" button in the floating menu.");
+                Log.i("Themis", "Step 1: Clicked the \"Shared decks\" button in the floating menu.");
                 /** Themis-#4977 */
 
                 mActionsMenu.collapse();

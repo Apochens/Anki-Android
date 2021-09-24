@@ -292,7 +292,7 @@ public class NavigationDrawerActivity extends AnkiActivity implements Navigation
                     case R.id.nav_browser:
 
                         /** Themis-#4977 */
-                        Log.i("Themis-#4977", "Step 2: Clicked the \"Browser\" in the menu. The crash will occur.");
+                        Log.i("Themis", "Step 2: Clicked the \"Browser\" in the menu. The crash will occur.");
                         /** Themis-#4977 */
 
                         openCardBrowser();
