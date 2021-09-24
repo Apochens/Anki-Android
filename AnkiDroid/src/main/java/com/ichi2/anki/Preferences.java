@@ -205,15 +205,15 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                 screen = listener.getPreferenceScreen();
 
                 /** Themis-#6145 */
-                Log.i("Themis-#6145", "Step 1: Click \"AnkiDroid\" in Preferences.");
+                Log.i("Themis", "Step 1: Click \"AnkiDroid\" in Preferences.");
                 ListPreference language = (ListPreference) screen.findPreference("language");
                 language.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                     @Override
                     public boolean onPreferenceChange(Preference preference, Object newValue) {
                         if (newValue.equals("zh_Cn")) {
-                            Log.i("Themis-#6145", "Step 2: Change language to " + newValue.toString());
+                            Log.i("Themis", "Step 2: Change language to " + newValue.toString());
                         } else {
-                            Log.i("Themis-#6145", "Warning 2: Change language to other language (not Chinese).");
+                            Log.i("Themis", "Warning 2: Change language to other language (not Chinese).");
                         }
                         return true;
                     }
@@ -297,16 +297,16 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                 screen = listener.getPreferenceScreen();
 
                 /** Themis-#6145 */
-                Log.i("Themis-#6145", "Step 3: Click \"Advanced\" in Preferences.");
+                Log.i("Themis", "Step 3: Click \"Advanced\" in Preferences.");
                 CheckBoxPreference schedVer = (CheckBoxPreference) screen.findPreference("schedVer");
                 schedVer.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                     @Override
                     public boolean onPreferenceChange(Preference preference, Object newValue) {
 
                         if (newValue.equals(true)) {
-                            Log.i("Themis-#6145", "Step 4: Enable the \"Experimental V2 Scheduler\".");
+                            Log.i("Themis", "Step 4: Enable the \"Experimental V2 Scheduler\".");
                         } else {
-                            Log.i("Themis-#6145", "Step -4: Disable the \"Experimental V2 Scheduler\".");
+                            Log.i("Themis", "Step -4: Disable the \"Experimental V2 Scheduler\".");
                         }
 
                         return true;

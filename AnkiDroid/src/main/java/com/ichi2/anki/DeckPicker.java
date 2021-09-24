@@ -649,7 +649,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             case R.id.action_export: {
 
                 /** Themis-#6145 */
-                Log.i("Themis-#6145", "Step 5: Selected \"Export colloction\" in menu at DeckPicker.");
+                Log.i("Themis", "Step 5: Selected \"Export colloction\" in menu at DeckPicker.");
                 /** Themis-#6145 */
 
                 Timber.i("DeckPicker:: Export collection button pressed");

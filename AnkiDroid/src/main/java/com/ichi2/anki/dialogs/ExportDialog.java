@@ -100,7 +100,7 @@ public class ExportDialog extends AnalyticsDialogFragment {
                     public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
 
                         /** Themis-#6145 */
-                        Log.i("Themis-#6145", "Step 6: Selected \"OK\" in Export Dialog. Bug will occur.");
+                        Log.i("Themis", "Step 6: Selected \"OK\" in Export Dialog. Bug will occur.");
                         /** Themis-#6145 */
 
                         ((ExportDialogListener) getActivity())
