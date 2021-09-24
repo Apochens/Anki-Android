@@ -306,7 +306,7 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                         if (newValue.equals(true)) {
                             Log.i("Themis", "Step 4: Enable the \"Experimental V2 Scheduler\".");
                         } else {
-                            Log.i("Themis", "Step -4: Disable the \"Experimental V2 Scheduler\".");
+                            Log.i("Themis", "Warning 4: Disable the \"Experimental V2 Scheduler\".");
                         }
 
                         return true;
