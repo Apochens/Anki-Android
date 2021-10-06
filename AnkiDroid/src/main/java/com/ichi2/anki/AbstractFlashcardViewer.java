@@ -47,6 +47,7 @@ import android.text.Spanned;
 import android.text.SpannedString;
 import android.text.TextUtils;
 import android.text.style.UnderlineSpan;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.GestureDetector.SimpleOnGestureListener;
 import android.view.KeyEvent;
@@ -1785,6 +1786,7 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity {
             mOptWaitAnswerSecond = revOptions.optInt("timeoutAnswerSeconds", 6);
             mOptWaitQuestionSecond = revOptions.optInt("timeoutQuestionSeconds", 60);
         } catch (JSONException e) {
+            Log.i("Themis", "Crash!: RuntimeException.");
             throw new RuntimeException();
         } catch (NullPointerException npe) {
             // NPE on collection only happens if the Collection is broken, follow AnkiActivity example

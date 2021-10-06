@@ -214,9 +214,9 @@ public class DeckPicker extends NavigationDrawerActivity implements
             long deckId = (long) v.getTag();
 
             /** Themis-#5756 */
-            Log.i("Themis", "Event 8: Selected deck "
-                    + deckId
-                    + " after previous steps. If no bug occurs, The Decker may be empty"
+            Log.i("Themis", "Event 8: Selected deck \""
+                    + ((TextView) v.findViewById(R.id.deckpicker_name)).getText()
+                    + "\" after previous steps. If no bug occurs, The Decker may be empty"
                     + " or the corresponding deck doesn't been selected.");
             /** Themis-#5756 */
 
@@ -567,7 +567,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             case R.id.action_new_filtered_deck: {
 
                 /** Themis-#5756 */
-                Log.i("Themis", "Event 3: Create filtered deck item was selected.");
+                Log.i("Themis", "Event 3: Selected \"Create filtered deck\" in the menu.");
                 /** Themis-#5756 */
 
                 Timber.i("DeckPicker:: New filtered deck button pressed");
@@ -597,6 +597,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
                             getCol().getDecks().newDyn(filteredDeckName);
                             openStudyOptions(true);
                         })
+                        .onNegative(((dialog, which) -> {
+                            /** Themis-#5756 */
+                            Log.i("Themis", "Warning 4: Canceled creating a new filtered deck.");
+                            /** Themis-#5756 */
+                        }))
                         .show();
                 return true;
             }
