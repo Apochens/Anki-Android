@@ -1437,8 +1437,9 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity {
         );
         LinearLayout answerArea = (LinearLayout) findViewById(R.id.bottom_area_layout);
         RelativeLayout.LayoutParams answerAreaParams = (RelativeLayout.LayoutParams) answerArea.getLayoutParams();
+        RelativeLayout.LayoutParams cardContainerParams;
         try {
-            RelativeLayout.LayoutParams cardContainerParams = (RelativeLayout.LayoutParams) mCardContainer.getLayoutParams();
+            cardContainerParams = (RelativeLayout.LayoutParams) mCardContainer.getLayoutParams();
         } catch (ClassCastException e) {
             Log.i("Themis", "Crash!: ClassCastException.");
             throw e;
