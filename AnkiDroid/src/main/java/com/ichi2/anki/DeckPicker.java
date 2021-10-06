@@ -513,7 +513,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             public void onClick(View view) {
 
                 /** Themis-#4707 */
-                Log.i("Themis", "Step 1: Click \"" + getString(R.string.menu_add) + "\" Button.");
+                Log.i("Themis", "Event 1: Click \"" + getString(R.string.menu_add) + "\" Button.");
                 /** Themis-#4707 */
 
                 mActionsMenu.collapse();
