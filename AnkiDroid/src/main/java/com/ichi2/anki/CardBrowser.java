@@ -36,6 +36,7 @@ import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.widget.SearchView;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -1361,6 +1362,9 @@ public class CardBrowser extends NavigationDrawerActivity implements
             if (result != null && mCards != null) {
                 Timber.i("CardBrowser:: Completed doInBackgroundSearchCards Successfuly");
                 updateList();
+                if (mSearchView == null) {
+                    Log.i("Themis", "Crash!: NullPointerException.");
+                }
                 if (!mSearchView.isIconified()) {
                     UIUtils.showSimpleSnackbar(CardBrowser.this, getSubtitleText(), true);
                 }
