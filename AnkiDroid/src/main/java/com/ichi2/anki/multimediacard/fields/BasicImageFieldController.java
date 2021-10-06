@@ -27,6 +27,7 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Environment;
+import android.os.FileUriExposedException;
 import android.provider.MediaStore;
 import android.provider.MediaStore.MediaColumns;
 import android.util.DisplayMetrics;
@@ -128,7 +129,11 @@ public class BasicImageFieldController extends FieldControllerBase implements IF
                     Uri uriSavedImage = Uri.fromFile(image);
 
                     cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, uriSavedImage);
-                    mActivity.startActivityForResult(cameraIntent, ACTIVITY_TAKE_PICTURE);
+                    try {
+                        mActivity.startActivityForResult(cameraIntent, ACTIVITY_TAKE_PICTURE);
+                    } catch (FileUriExposedException e) {
+                        Log.i("Themis", "Crash!: FileUriExposedException");
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
