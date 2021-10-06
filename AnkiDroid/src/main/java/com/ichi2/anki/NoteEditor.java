@@ -1296,7 +1296,7 @@ public class NoteEditor extends AnkiActivity {
 
                 /** Themis-#5638 */
                 if (index == 0 && arg0.toString().equals("&bsol;")) {
-                    Log.i("Themis", "Step 2: Input \"&bsol;\" in the \"" + getString(R.string.card_template_editor_front) + "\" TextEditor，Causing the bug #5638.");
+                    Log.i("Themis", "Event 2: Input \"&bsol;\" in the \"" + getString(R.string.card_template_editor_front) + "\" TextEditor，Causing the bug #5638.");
                 }
                 /** Themis-#5638*/
 
