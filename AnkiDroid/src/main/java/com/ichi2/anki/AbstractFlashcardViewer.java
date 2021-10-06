@@ -48,6 +48,7 @@ import android.text.Spanned;
 import android.text.SpannedString;
 import android.text.TextUtils;
 import android.text.style.UnderlineSpan;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.GestureDetector.SimpleOnGestureListener;
 import android.view.KeyEvent;
@@ -1436,7 +1437,12 @@ public abstract class AbstractFlashcardViewer extends NavigationDrawerActivity {
         );
         LinearLayout answerArea = (LinearLayout) findViewById(R.id.bottom_area_layout);
         RelativeLayout.LayoutParams answerAreaParams = (RelativeLayout.LayoutParams) answerArea.getLayoutParams();
-        RelativeLayout.LayoutParams cardContainerParams = (RelativeLayout.LayoutParams) mCardContainer.getLayoutParams();
+        try {
+            RelativeLayout.LayoutParams cardContainerParams = (RelativeLayout.LayoutParams) mCardContainer.getLayoutParams();
+        } catch (ClassCastException e) {
+            Log.i("Themis", "Crash!: ClassCastException.");
+            throw e;
+        }
 
         switch (answerButtonsPosition) {
             case "top":
