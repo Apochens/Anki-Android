@@ -201,11 +201,11 @@ public class DeckPicker extends NavigationDrawerActivity implements
         public void onClick(View v) {
             long deckId = (long) v.getTag();
 
-            /** Themis-#4707 */
-            Log.i("Themis-#4707", "Step 5: Selected Decker "
+            /** Themis-#4451 */
+            Log.i("Themis", "Event 5: Selected Decker "
                     + deckId
-                    + " after previous steps, causing the bug #4707");
-            /** Themis-#4707 */
+                    + " after previous steps, causing the bug #4451");
+            /** Themis-#4451 */
 
             Timber.i("DeckPicker:: Selected deck with id %d", deckId);
             if (mActionsMenu != null && mActionsMenu.isExpanded()) {

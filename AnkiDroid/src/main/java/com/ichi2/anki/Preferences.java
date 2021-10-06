@@ -243,7 +243,7 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
             case "com.ichi2.anki.prefs.reviewing":
 
                 /** Themis-#4451 */
-                Log.i("Themis", "Step 3: Click \""+ getString(R.string.pref_cat_reviewing)+"\" item in Preferences.");
+                Log.i("Themis", "Event 3: Click \""+ getString(R.string.pref_cat_reviewing)+"\" item in Preferences.");
                 /** Themis-#4451 */
 
                 listener.addPreferencesFromResource(R.xml.preferences_reviewing);
@@ -258,12 +258,12 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
 
                             /** Themis-#4451 */
                             if (newValue.equals("2") && !prefs.getString("fullscreenMode", "2").equals("2")) {
-                                Log.i("Themis", "Step 4: Set \""
+                                Log.i("Themis", "Event 4: Set \""
                                         + getString(R.string.full_screen_complete)
                                         + "\" mode in Fullscreen Mode.");
                             }
                             if (!newValue.equals("2") && prefs.getString("fullscreenMode", "2").equals("2")) {
-                                Log.i("Themis", "step -4: Canceled \""
+                                Log.i("Themis", "Warning 4: Canceled \""
                                         + getString(R.string.full_screen_complete)
                                         + "\" mode in Fullscreen Mode.");
                             }
@@ -296,7 +296,7 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
             case "com.ichi2.anki.prefs.gestures":
 
                 /** Themis-#4451 */
-                Log.i("Themis", "Step 1: Click \""+ getString(R.string.pref_cat_gestures)+"\" item in Preferences.");
+                Log.i("Themis", "Event 1: Click \""+ getString(R.string.pref_cat_gestures)+"\" item in Preferences.");
                 /** Themis-#4451 */
 
                 listener.addPreferencesFromResource(R.xml.preferences_gestures);
@@ -308,7 +308,7 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                     @Override
                     public boolean onPreferenceChange(Preference preference, Object newValue) {
                         if (newValue.equals(true)) {
-                            Log.i("Themis", "Step 2: Enable gestures.");
+                            Log.i("Themis", "Event 2: Enable gestures.");
                         } else {
                             Log.i("Themis", "Warning 2: Disable gestures.");
                         }
