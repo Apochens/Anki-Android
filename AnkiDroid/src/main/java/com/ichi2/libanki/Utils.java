@@ -26,6 +26,8 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.net.Uri;
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 
 import com.ichi2.anki.AnkiFont;
@@ -248,7 +250,12 @@ public class Utils {
         Matcher htmlEntities = htmlEntitiesPattern.matcher(html);
         StringBuffer sb = new StringBuffer();
         while (htmlEntities.find()) {
-            htmlEntities.appendReplacement(sb, CompatHelper.getCompat().fromHtml(htmlEntities.group()).toString());
+            try {
+                htmlEntities.appendReplacement(sb, CompatHelper.getCompat().fromHtml(htmlEntities.group()).toString());
+            } catch (ArrayIndexOutOfBoundsException e) {
+                Log.i("Themis", "Crash!: ArrayIndexOutOfBoundsException.");
+                throw e;
+            }
         }
         htmlEntities.appendTail(sb);
         return sb.toString();

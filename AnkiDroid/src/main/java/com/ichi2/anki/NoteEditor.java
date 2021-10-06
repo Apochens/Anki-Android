@@ -1295,9 +1295,7 @@ public class NoteEditor extends AnkiActivity {
             public void afterTextChanged(Editable arg0) {
 
                 /** Themis-#5638 */
-                if (index == 0 && arg0.toString().equals("&bsol;")) {
-                    Log.i("Themis", "Event 2: Input \"&bsol;\" in the \"" + getString(R.string.card_template_editor_front) + "\" TextEditor，Causing the bug #5638.");
-                }
+                Log.i("Themis", "Event 2: Input a string: " + arg0);
                 /** Themis-#5638*/
 
                 mFieldEdited = true;
