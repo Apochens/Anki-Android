@@ -156,7 +156,7 @@ public class Reviewer extends AbstractFlashcardViewer {
             case R.id.action_edit:
 
                 /** Themis-#4200 */
-                Log.i("Themis", "Step 2: Edit note button pressed.");
+                Log.i("Themis", "Event 2: Edit note button pressed.");
                 /** Themis-#4200 */
 
                 Timber.i("Reviewer:: Edit note button pressed");
