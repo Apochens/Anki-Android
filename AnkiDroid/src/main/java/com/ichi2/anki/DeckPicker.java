@@ -214,7 +214,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             long deckId = (long) v.getTag();
 
             /** Themis-#5756 */
-            Log.i("Themis", "Step 8: Selected deck "
+            Log.i("Themis", "Event 8: Selected deck "
                     + deckId
                     + " after previous steps. If no bug occurs, The Decker may be empty"
                     + " or the corresponding deck doesn't been selected.");
@@ -501,7 +501,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
         addNoteButton.setOnClickListener(view -> {
 
             /** Themis-#5756 */
-            Log.i("Themis", "Step 1: Click \"" + getString(R.string.menu_add) + "\" Button.");
+            Log.i("Themis", "Event 1: Click \"" + getString(R.string.menu_add) + "\" Button.");
             /** Themis-#5756 */
 
             mActionsMenu.collapse();
@@ -567,7 +567,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             case R.id.action_new_filtered_deck: {
 
                 /** Themis-#5756 */
-                Log.i("Themis", "Step 3: Create filtered deck item was selected.");
+                Log.i("Themis", "Event 3: Create filtered deck item was selected.");
                 /** Themis-#5756 */
 
                 Timber.i("DeckPicker:: New filtered deck button pressed");
@@ -589,7 +589,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
                         .onPositive((dialog, which) -> {
 
                             /** Themis-#5756 */
-                            Log.i("Themis", "Step 4: Created a new filtered deck.");
+                            Log.i("Themis", "Event 4: Created a new filtered deck.");
                             /** Themis-#5756 */
 
                             String filteredDeckName = mDialogEditText.getText().toString();

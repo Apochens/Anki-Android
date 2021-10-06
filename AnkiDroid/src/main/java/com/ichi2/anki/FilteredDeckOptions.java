@@ -132,10 +132,10 @@ public class FilteredDeckOptions extends AppCompatPreferenceActivity implements 
 
                         /** Themis-#5756 */
                         if (entry.getKey().equals("order") && entry.getValue().equals("1")) {
-                            Log.i("Themis", "Step 5: Switch order to \"Random\".");
+                            Log.i("Themis", "Event 5: Switch order to \"Random\".");
                         }
                         if (entry.getKey().equals("order") && entry.getValue().equals("0")) {
-                            Log.i("Themis", "Step 6: Switch order back to \"Oldest seen first\".");
+                            Log.i("Themis", "Event 6: Switch order back to \"Oldest seen first\".");
                         }
                         /** Themis-#5756 */
 
@@ -420,7 +420,7 @@ public class FilteredDeckOptions extends AppCompatPreferenceActivity implements 
 
                 /** Themis-#5756 */
                 try {
-                    Log.i("Themis", "Step 7: Go back from Options for " + mDeck.getString("name") + ".");
+                    Log.i("Themis", "Event 7: Go back from Options for " + mDeck.getString("name") + ".");
                 } catch (Exception e) {
 
                 }
