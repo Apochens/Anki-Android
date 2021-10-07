@@ -21,6 +21,7 @@ package com.ichi2.async;
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.AsyncTask;
+import android.util.Log;
 
 import com.google.gson.stream.JsonReader;
 import com.ichi2.anki.AnkiDroidApp;
@@ -397,7 +398,13 @@ public class DeckTask extends BaseAsyncTask<DeckTask.TaskData, DeckTask.TaskData
         Collection col = CollectionHelper.getInstance().getCol(mContext);
         Sched sched = col.getSched();
         Card editCard = params[0].getCard();
-        Note editNote = editCard.note();
+        Note editNote;
+        try {
+            editNote = editCard.note();
+        } catch (RuntimeException e) {
+            Log.i("Themis", "Crash!: RuntimeException");
+            throw e;
+        }
         boolean fromReviewer = params[0].getBoolean();
 
         try {

@@ -197,7 +197,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             long deckId = (long) v.getTag();
 
             /** Themis-#4200 */
-            Log.i("Themis", "Event 1: Selected Decker " + ((TextView)v.findViewById(R.id.deckpicker_name)).getText());
+            Log.i("Themis", "Event 1: Selected Decker " + ((TextView)v.findViewById(R.id.deckpicker_name)).getText() + ".");
             /** Themis-#4200 */
 
             Timber.i("DeckPicker:: Selected deck with id %d", deckId);

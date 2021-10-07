@@ -835,9 +835,7 @@ public class NoteEditor extends AnkiActivity {
             case R.id.action_save:
 
                 /** Themis-#4200 */
-                Log.i("Themis", "Event 4: Save note button pressed in NoteEditor, causing the bug." +
-                        " No bug caused means \"Don't keep activities\" options in developer mode haven't been enabled," +
-                        " or text keep the same after change.");
+                Log.i("Themis", "Event 4: Pressed \"Save note\" button in NoteEditor.");
                 /** Themis-#4200 */
 
                 Timber.i("NoteEditor:: Save note button pressed");
@@ -1263,7 +1261,7 @@ public class NoteEditor extends AnkiActivity {
             public void afterTextChanged(Editable arg0) {
 
                 /** Themis-#4200 */
-                Log.i("Themis-#4200", "Step 3: Make any change in text idx(" + index + ").");
+                Log.i("Themis", "Event 3: Make any change in text idx(" + index + ").");
                 /** Themis-#4200*/
 
                 mFieldEdited = true;
