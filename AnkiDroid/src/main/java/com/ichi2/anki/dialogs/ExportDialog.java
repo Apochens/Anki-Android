@@ -100,7 +100,7 @@ public class ExportDialog extends AnalyticsDialogFragment {
                     public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
 
                         /** Themis-#6145 */
-                        Log.i("Themis", "Event 6: Selected \"OK\" in Export Dialog. Bug will occur.");
+                        Log.i("Themis", "Event 6: Selected \"OK\" in Export Dialog.");
                         /** Themis-#6145 */
 
                         ((ExportDialogListener) getActivity())
@@ -111,6 +111,11 @@ public class ExportDialog extends AnalyticsDialogFragment {
                 .onNegative(new MaterialDialog.SingleButtonCallback() {
                     @Override
                     public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
+
+                        /** Themis-#6145 */
+                        Log.i("Themis", "Warning 6: Selected \"Cancel\" in Export Dialog.");
+                        /** Themis-#6145 */
+
                         dismissAllDialogFragments();
                     }
                 });

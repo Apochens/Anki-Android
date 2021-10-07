@@ -19,6 +19,7 @@ package com.ichi2.libanki;
 
 import android.database.Cursor;
 
+import android.util.Log;
 import android.util.Pair;
 
 import com.ichi2.utils.JSONObject;
@@ -197,7 +198,14 @@ public class Note implements Cloneable {
 
 
     private int _fieldOrd(String key) {
-        return mFMap.get(key).first;
+        int temp;
+        try {
+            temp = mFMap.get(key).first;
+        } catch (RuntimeException e) {
+            Log.i("Themis", "Crash!: RuntimeException.");
+            throw e;
+        }
+        return temp;
     }
 
 

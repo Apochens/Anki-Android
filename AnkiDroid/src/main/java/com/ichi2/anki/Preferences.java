@@ -210,7 +210,7 @@ public class Preferences extends AppCompatPreferenceActivity implements Preferen
                 language.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                     @Override
                     public boolean onPreferenceChange(Preference preference, Object newValue) {
-                        if (newValue.equals("zh_Cn")) {
+                        if (((String)newValue).equals("zh_CN")) {
                             Log.i("Themis", "Event 2: Change language to " + newValue.toString());
                         } else {
                             Log.i("Themis", "Warning 2: Change language to other language (not Chinese).");
