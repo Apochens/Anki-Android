@@ -133,6 +133,7 @@ public class BasicImageFieldController extends FieldControllerBase implements IF
                         mActivity.startActivityForResult(cameraIntent, ACTIVITY_TAKE_PICTURE);
                     } catch (FileUriExposedException e) {
                         Log.i("Themis", "Crash!: FileUriExposedException");
+                        throw e;
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
