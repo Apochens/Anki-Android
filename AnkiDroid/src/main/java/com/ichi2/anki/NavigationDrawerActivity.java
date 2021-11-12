@@ -124,6 +124,11 @@ public class NavigationDrawerActivity extends AnkiActivity implements Navigation
 
             @Override
             public void onDrawerOpened(View drawerView) {
+
+                /** Themis-#4977 **/
+                Log.i("Themis", "Event 2: Opened the drawer.");
+                /** Themis-#4977 **/
+
                 super.onDrawerOpened(drawerView);
                 supportInvalidateOptionsMenu();
             }
@@ -292,7 +297,7 @@ public class NavigationDrawerActivity extends AnkiActivity implements Navigation
                     case R.id.nav_browser:
 
                         /** Themis-#4977 */
-                        Log.i("Themis", "Event 2: Clicked the \"Browser\" in the menu. The crash will occur.");
+                        Log.i("Themis", "Event 3: Clicked the \"Browser\" in the menu.");
                         /** Themis-#4977 */
 
                         openCardBrowser();
