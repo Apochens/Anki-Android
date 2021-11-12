@@ -27,6 +27,7 @@ import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.widget.SwitchCompat;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -115,6 +116,11 @@ public class NavigationDrawerActivity extends AnkiActivity implements Navigation
 
             @Override
             public void onDrawerOpened(View drawerView) {
+
+                /** Themis-#4451 **/
+                Log.i("Themis", "Event 1: Opened the drawer.");
+                /** Themis-#4451 **/
+
                 super.onDrawerOpened(drawerView);
                 supportInvalidateOptionsMenu();
             }
@@ -271,6 +277,11 @@ public class NavigationDrawerActivity extends AnkiActivity implements Navigation
                 mNightModeSwitch.performClick();
                 return true;
             case R.id.nav_settings:
+
+                /** Themis-#4451 **/
+                Log.i("Themis", "Event 2: Selected \"Settings\" in the drawer.");
+                /** Themis-#4451 **/
+
                 mOldColPath = CollectionHelper.getCurrentAnkiDroidDirectory(this);
                 // Remember the theme we started with so we can restart the Activity if it changes
                 mOldTheme = Themes.getCurrentTheme(getApplicationContext());

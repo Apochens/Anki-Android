@@ -202,9 +202,9 @@ public class DeckPicker extends NavigationDrawerActivity implements
             long deckId = (long) v.getTag();
 
             /** Themis-#4451 */
-            Log.i("Themis", "Event 5: Selected Decker "
+            Log.i("Themis", "Event 7: Selected Decker "
                     + deckId
-                    + " after previous steps, causing the bug #4451");
+                    + ".");
             /** Themis-#4451 */
 
             Timber.i("DeckPicker:: Selected deck with id %d", deckId);
