@@ -115,7 +115,7 @@ public class BasicImageFieldController extends FieldControllerBase implements IF
             public void onClick(View v) {
 
                 /** Themis-#4707 */
-                Log.i("Themis", "Event 4: Click \"Camera\" button. The crash will occur.");
+                Log.i("Themis", "Event 3: Click \"Camera\" button. The crash will occur.");
                 /** Themis-#4707 */
 
                 Intent cameraIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);

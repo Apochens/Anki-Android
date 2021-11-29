@@ -1171,11 +1171,6 @@ public class NoteEditor extends AnkiActivity {
                                     startMultimediaFieldEditor(index, mNote, field);
                                     return true;
                                 case R.id.menu_multimedia_photo:
-
-                                    /** Themis-#4707 */
-                                    Log.i("Themis", "Event 3: Click \"add image\" button at field " + index + ".");
-                                    /** Themis-#4707 */
-
                                     Timber.i("NoteEditor:: Add image button pressed");
                                     field = new ImageField();
                                     mNote.setField(index, field);
