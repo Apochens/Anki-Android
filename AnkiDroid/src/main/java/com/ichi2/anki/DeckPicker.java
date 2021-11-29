@@ -202,9 +202,12 @@ public class DeckPicker extends NavigationDrawerActivity implements
             long deckId = (long) v.getTag();
 
             /** Themis-#4451 */
-            Log.i("Themis", "Event 7: Selected Decker "
-                    + deckId
-                    + ".");
+            SharedPreferences prefs = AnkiDroidApp.getSharedPrefs(getBaseContext());
+            Boolean gesture = prefs.getBoolean("gestures", false);
+            String fullScreenMode = prefs.getString("fullscreenMode", "0");
+            if (fullScreenMode == "2") {
+                Log.i("Themis", "Event 7: Selected Decker " + deckId + " with full screen mode on.");
+            }
             /** Themis-#4451 */
 
             Timber.i("DeckPicker:: Selected deck with id %d", deckId);
