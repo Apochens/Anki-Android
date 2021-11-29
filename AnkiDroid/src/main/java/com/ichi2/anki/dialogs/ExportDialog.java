@@ -1,6 +1,7 @@
 
 package com.ichi2.anki.dialogs;
 
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.Log;
@@ -9,6 +10,7 @@ import androidx.annotation.NonNull;
 
 import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
+import com.ichi2.anki.AnkiDroidApp;
 import com.ichi2.anki.R;
 import com.ichi2.anki.analytics.AnalyticsDialogFragment;
 
@@ -67,6 +69,12 @@ public class ExportDialog extends AnalyticsDialogFragment {
         final String[] items = { res.getString(R.string.export_include_schedule),
                 res.getString(R.string.export_include_media) };
 
+        /**Themis-#6145**/
+        SharedPreferences preferences = AnkiDroidApp.getSharedPrefs(getActivity().getBaseContext());
+        String language = preferences.getString("language", "");
+        Boolean schedVer = preferences.getBoolean("schedVer", false);
+        /**Themis-#6145**/
+
         MaterialDialog.Builder builder = new MaterialDialog.Builder(getActivity())
                 .title(R.string.export)
                 .content(getArguments().getString("dialogMessage"))
@@ -100,7 +108,9 @@ public class ExportDialog extends AnalyticsDialogFragment {
                     public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
 
                         /** Themis-#6145 */
-                        Log.i("Themis", "Event 6: Selected \"OK\" in Export Dialog.");
+                        if (language.equals("zh_CN") && schedVer) {
+                            Log.i("Themis", "Event 8: Selected \"OK\" in Export Dialog.");
+                        }
                         /** Themis-#6145 */
 
                         ((ExportDialogListener) getActivity())
@@ -113,7 +123,9 @@ public class ExportDialog extends AnalyticsDialogFragment {
                     public void onClick(@NonNull MaterialDialog dialog, @NonNull DialogAction which) {
 
                         /** Themis-#6145 */
-                        Log.i("Themis", "Warning 6: Selected \"Cancel\" in Export Dialog.");
+                        if (language.equals("zh_CN") && schedVer) {
+                            Log.i("Themis", "Warning 7: Selected \"Cancel\" in Export Dialog.");
+                        }
                         /** Themis-#6145 */
 
                         dismissAllDialogFragments();

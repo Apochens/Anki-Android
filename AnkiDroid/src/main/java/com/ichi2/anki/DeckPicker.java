@@ -649,7 +649,12 @@ public class DeckPicker extends NavigationDrawerActivity implements
             case R.id.action_export: {
 
                 /** Themis-#6145 */
-                Log.i("Themis", "Event 5: Selected \"Export colloction\" in menu at DeckPicker.");
+                SharedPreferences preferences = AnkiDroidApp.getSharedPrefs(getBaseContext());
+                String language = preferences.getString("language", "");
+                Boolean schedVer = preferences.getBoolean("schedVer", false);
+                if (language.equals("zh_CN") && schedVer) {
+                    Log.i("Themis", "Event 7: Selected \"Export colloction\" in menu at DeckPicker.");
+                }
                 /** Themis-#6145 */
 
                 Timber.i("DeckPicker:: Export collection button pressed");
