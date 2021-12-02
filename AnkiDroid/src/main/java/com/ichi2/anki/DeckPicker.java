@@ -216,8 +216,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             /** Themis-#5756 */
             Log.i("Themis", "Event 8: Selected deck \""
                     + ((TextView) v.findViewById(R.id.deckpicker_name)).getText()
-                    + "\" after previous steps. If no bug occurs, The Decker may be empty"
-                    + " or the corresponding deck doesn't been selected.");
+                    + "\".");
             /** Themis-#5756 */
 
             Timber.i("DeckPicker:: Selected deck with id %d", deckId);

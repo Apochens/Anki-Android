@@ -23,6 +23,7 @@ import android.os.Bundle;
 import androidx.fragment.app.Fragment;
 import androidx.appcompat.widget.Toolbar;
 import android.text.method.LinkMovementMethod;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -121,6 +122,11 @@ public class StudyOptionsFragment extends Fragment implements Toolbar.OnMenuItem
     private View.OnClickListener mButtonClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
+
+            /** Themis-#5756 */
+            Log.i("Themis", "Event 7: Pressed the \"STUDY\" button.");
+            /** Themis-#5756 */
+
             // long timeLimit = 0;
             switch (v.getId()) {
                 case R.id.studyoptions_start:
