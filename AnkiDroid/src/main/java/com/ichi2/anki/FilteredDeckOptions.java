@@ -131,9 +131,10 @@ public class FilteredDeckOptions extends AppCompatPreferenceActivity implements 
                     for (Entry<String, Object> entry : mUpdate.valueSet()) {
 
                         /** Themis-#5756 */
-                        if (entry.getKey().equals("order") && !entry.getValue().equals("0")) {
-                            Log.i("Themis", "Event 5: Switch order to \"Random\".");
+                        if (entry.getKey().equals("order")) {
+                            Log.i("Themis", "Event 3: Switched the order which cards selected by.");
                         }
+//                         && !entry.getValue().equals("0")
 //                        if (entry.getKey().equals("order") && entry.getValue().equals("0")) {
 //                            Log.i("Themis", "Event 6: Switch order back to \"Oldest seen first\".");
 //                        }
@@ -417,15 +418,6 @@ public class FilteredDeckOptions extends AppCompatPreferenceActivity implements 
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case android.R.id.home:
-
-                /** Themis-#5756 */
-                try {
-                    Log.i("Themis", "Event 6: Go back from Options for " + mDeck.getString("name") + ".");
-                } catch (Exception e) {
-
-                }
-                /** Themis-#5756 */
-
                 closeDeckOptions();
                 return true;
         }

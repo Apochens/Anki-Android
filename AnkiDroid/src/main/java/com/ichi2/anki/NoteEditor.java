@@ -881,9 +881,9 @@ public class NoteEditor extends AnkiActivity {
 
             case R.id.action_save:
 
-                /** Themis-#5756 */
-                Log.i("Themis", "Event 2: Save or add a note.");
-                /** Themis-#5756 */
+//                /** Themis-#5756 */
+//                Log.i("Themis", "Event 2: Save or add a note.");
+//                /** Themis-#5756 */
 
                 Timber.i("NoteEditor:: Save note button pressed");
                 saveNote();

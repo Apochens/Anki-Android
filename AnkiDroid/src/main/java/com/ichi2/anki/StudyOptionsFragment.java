@@ -122,14 +122,14 @@ public class StudyOptionsFragment extends Fragment implements Toolbar.OnMenuItem
     private View.OnClickListener mButtonClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-
-            /** Themis-#5756 */
-            Log.i("Themis", "Event 7: Pressed the \"STUDY\" button.");
-            /** Themis-#5756 */
-
             // long timeLimit = 0;
             switch (v.getId()) {
                 case R.id.studyoptions_start:
+
+                    /** Themis-#5756 */
+                    Log.i("Themis", "Event 4: Pressed the \"STUDY\" button.");
+                    /** Themis-#5756 */
+
                     Timber.i("StudyOptionsFragment:: start study button pressed");
                     if (mCurrentContentView != CONTENT_CONGRATS) {
                         openReviewer();

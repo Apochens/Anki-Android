@@ -214,7 +214,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             long deckId = (long) v.getTag();
 
             /** Themis-#5756 */
-            Log.i("Themis", "Event 8: Selected deck \""
+            Log.i("Themis", "Event 5: Selected deck \""
                     + ((TextView) v.findViewById(R.id.deckpicker_name)).getText()
                     + "\".");
             /** Themis-#5756 */
@@ -499,9 +499,9 @@ public class DeckPicker extends NavigationDrawerActivity implements
         });
         addNoteButton.setOnClickListener(view -> {
 
-            /** Themis-#5756 */
-            Log.i("Themis", "Event 1: Click \"" + getString(R.string.menu_add) + "\" Button.");
-            /** Themis-#5756 */
+//            /** Themis-#5756 */
+//            Log.i("Themis", "Event 1: Click \"" + getString(R.string.menu_add) + "\" Button.");
+//            /** Themis-#5756 */
 
             mActionsMenu.collapse();
             addNote();
@@ -566,7 +566,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
             case R.id.action_new_filtered_deck: {
 
                 /** Themis-#5756 */
-                Log.i("Themis", "Event 3: Selected \"Create filtered deck\" in the menu.");
+                Log.i("Themis", "Event 1: Selected \"Create filtered deck\" in the menu.");
                 /** Themis-#5756 */
 
                 Timber.i("DeckPicker:: New filtered deck button pressed");
@@ -588,7 +588,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
                         .onPositive((dialog, which) -> {
 
                             /** Themis-#5756 */
-                            Log.i("Themis", "Event 4: Created a new filtered deck.");
+                            Log.i("Themis", "Event 2: Created a new filtered deck.");
                             /** Themis-#5756 */
 
                             String filteredDeckName = mDialogEditText.getText().toString();
@@ -598,7 +598,7 @@ public class DeckPicker extends NavigationDrawerActivity implements
                         })
                         .onNegative(((dialog, which) -> {
                             /** Themis-#5756 */
-                            Log.i("Themis", "Warning 4: Canceled creating a new filtered deck.");
+                            Log.i("Themis", "Warning 2: Canceled creating a new filtered deck.");
                             /** Themis-#5756 */
                         }))
                         .show();
