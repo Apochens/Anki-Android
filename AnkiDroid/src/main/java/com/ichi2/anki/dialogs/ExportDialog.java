@@ -124,7 +124,7 @@ public class ExportDialog extends AnalyticsDialogFragment {
 
                         /** Themis-#6145 */
                         if (language.equals("zh_CN") && schedVer) {
-                            Log.i("Themis", "Warning 7: Selected \"Cancel\" in Export Dialog.");
+                            Log.i("Themis", "Warning 8: Selected \"Cancel\" in Export Dialog.");
                         }
                         /** Themis-#6145 */
 
