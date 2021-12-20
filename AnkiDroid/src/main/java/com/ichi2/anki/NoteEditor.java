@@ -1295,7 +1295,9 @@ public class NoteEditor extends AnkiActivity {
             public void afterTextChanged(Editable arg0) {
 
                 /** Themis-#5638 */
-                Log.i("Themis", "Event 2: Input a string: " + arg0);
+                if (index == 0) {
+                    Log.i("Themis", "Event 1: Input a string \"" + arg0 + "\" in the upper TextEditor.");
+                }
                 /** Themis-#5638*/
 
                 mFieldEdited = true;

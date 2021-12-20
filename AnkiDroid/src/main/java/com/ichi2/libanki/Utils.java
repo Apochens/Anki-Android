@@ -253,6 +253,7 @@ public class Utils {
             try {
                 htmlEntities.appendReplacement(sb, CompatHelper.getCompat().fromHtml(htmlEntities.group()).toString());
             } catch (ArrayIndexOutOfBoundsException e) {
+                Log.i("Themis", "Event 2: Input an invalid string in the upper TextEditor.");
                 Log.i("Themis", "Crash!: ArrayIndexOutOfBoundsException.");
                 throw e;
             }

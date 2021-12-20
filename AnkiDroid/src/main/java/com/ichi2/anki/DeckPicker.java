@@ -491,9 +491,9 @@ public class DeckPicker extends NavigationDrawerActivity implements
         });
         addNoteButton.setOnClickListener(view -> {
 
-            /** Themis-#5638 */
-            Log.i("Themis", "Event 1: Click \"" + getString(R.string.menu_add) + "\" Button.");
-            /** Themis-#5638 */
+//            /** Themis-#5638 */
+//            Log.i("Themis", "Event 1: Clicked \"" + getString(R.string.menu_add) + "\" Button.");
+//            /** Themis-#5638 */
 
             mActionsMenu.collapse();
             addNote();
