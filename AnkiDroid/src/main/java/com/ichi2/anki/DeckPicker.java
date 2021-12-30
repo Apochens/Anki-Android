@@ -205,8 +205,8 @@ public class DeckPicker extends NavigationDrawerActivity implements
             SharedPreferences prefs = AnkiDroidApp.getSharedPrefs(getBaseContext());
             Boolean gesture = prefs.getBoolean("gestures", false);
             String fullScreenMode = prefs.getString("fullscreenMode", "0");
-            if (fullScreenMode == "2") {
-                Log.i("Themis", "Event 7: Selected Decker " + deckId + " with full screen mode on.");
+            if (gesture && fullScreenMode.equals("2")) {
+                Log.i("Themis", "Event 7: Selected Decker " + deckId + " with full screen mode and gesture on.");
             }
             /** Themis-#4451 */
 
